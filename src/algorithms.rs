@@ -1,10 +1,13 @@
 use rand::{prelude::SliceRandom, seq::index};
 
-use crate::job::{self, Environment, Job};
+use crate::{
+    instance::Instance,
+    job::{Environment, Job},
+};
 
-pub fn spt(lengths: &[f64]) -> f64 {
-    let mut jobs = lengths.to_vec();
-    jobs.sort_by(|a,b| a.partial_cmp(&b).unwrap());
+pub fn spt(instance: &Instance) -> f64 {
+    let mut jobs = instance.jobs.clone();
+    jobs.sort_by(|a, b| a.partial_cmp(&b).unwrap());
     let mut obj = 0.0;
     let mut t = 0.0;
     for j in jobs {
@@ -13,7 +16,6 @@ pub fn spt(lengths: &[f64]) -> f64 {
     }
     obj
 }
-
 
 pub fn preferrential_rr(mut jobs: Vec<Job>, trustness: f64) -> f64 {
     jobs.sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
@@ -39,7 +41,7 @@ pub fn preferrential_rr(mut jobs: Vec<Job>, trustness: f64) -> f64 {
             continue;
         }
 
-        let mut l = 0.0;
+        let l;
         if trustness > 0.0 {
             l = (jobs[rr].length * (n_alive as f64) / trustness).min(
                 (jobs[pred_order[pspt]].length * (n_alive as f64))
@@ -50,16 +52,18 @@ pub fn preferrential_rr(mut jobs: Vec<Job>, trustness: f64) -> f64 {
         }
         t += l;
 
-        for (i, job) in jobs.iter_mut().enumerate().skip(rr) {
-            if i != pred_order[pspt] {
-                job.length -= l * trustness / (n_alive as f64);
-                if job.length == 0.0 {
-                    job.completed = true;
-                    n_alive -= 1;
-                    obj += t;
-                    rr += 1;
-                } else if job.completed && i == rr {
-                    rr += 1;
+        if trustness > 0.0 {
+            for (i, job) in jobs.iter_mut().enumerate().skip(rr) {
+                if i != pred_order[pspt] {
+                    job.length -= l * trustness / (n_alive as f64);
+                    if job.length == 0.0 {
+                        job.completed = true;
+                        n_alive -= 1;
+                        obj += t;
+                        rr += 1;
+                    } else if job.completed && i == rr {
+                        rr += 1;
+                    }
                 }
             }
         }
@@ -147,24 +151,25 @@ pub fn phase_algorithm(jobs: Vec<Job>, trustness: f64) -> f64 {
 fn median_est(env: &mut Environment, delta: f64) -> f64 {
     let sample_size = ((2.0 * env.n as f64).ln() / (delta * delta)).ceil() as usize;
     let indices = (0..env.nk()).collect::<Vec<usize>>();
-    let mut rng = rand::thread_rng();
+    //let mut rng = rand::thread_rng();
     // TODO still a bug when sampling with replacement.
     //let mut sample: Vec<&usize> = indices.choose_multiple(&mut rng, sample_size).collect(); //
     let mut sample: Vec<&usize> = sample_with_replacement(&indices, sample_size);
     let max_index = **sample.iter().max().unwrap();
-    let mut occurences = vec![0; max_index+1];
+    let mut occurences = vec![0; max_index + 1];
     for &&idx in &sample {
         occurences[idx] += 1;
     }
 
     sample.sort_by(|&i, &j| {
-        (env.jobs[*i]
-            .length / occurences[*i] as f64)
+        (env.jobs[*i].length / occurences[*i] as f64)
             .partial_cmp(&(env.jobs[*j].length / occurences[*j] as f64))
             .unwrap()
     });
+    let initial_lengths: Vec<f64> = sample.iter().map(|j| env.jobs[**j].length).collect();
+
     println!("sample size {}", sample_size);
-    assert_eq!(sample.len(), sample_size);
+    //assert_eq!(sample.len(), sample_size);
     let mut rr_per_job = 0.0;
     let mut equal_counter = 1.0;
 
@@ -174,14 +179,15 @@ fn median_est(env: &mut Environment, delta: f64) -> f64 {
             continue;
         }
         env.process(job_idx, rr_per_job * equal_counter);
-        let l = env.jobs[job_idx].length * ((sample_size - i) as f64 + equal_counter - 1.0) / equal_counter ;
+        let l = env.jobs[job_idx].length * ((sample_size - i) as f64 + equal_counter - 1.0)
+            / equal_counter;
         rr_per_job += env.jobs[job_idx].length / equal_counter;
         env.run_for(l);
         env.complete(job_idx);
 
         if 2 * i >= sample_size {
             env.clear_completed();
-            return rr_per_job;// * equal_counter;
+            return initial_lengths[i]; //rr_per_job;// * equal_counter;
         }
         equal_counter = 1.0;
     }
@@ -205,7 +211,7 @@ fn error_est(env: &mut Environment, trustness: f64, est_median: f64) -> f64 {
     job_sample.sort();
     job_sample.dedup();
 
-    let mut d = vec![0.0; env.nk()+1];
+    let mut d = vec![0.0; env.nk() + 1];
     let max_l = (1.0 + trustness) * est_median;
 
     for job_idx in job_sample {

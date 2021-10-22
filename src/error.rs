@@ -1,4 +1,4 @@
-use crate::{algorithms::spt, job::Job};
+use crate::{algorithms::spt, instance::Instance, job::Job};
 
 
 pub trait ErrorMeasure {
@@ -18,8 +18,8 @@ pub struct MaxMinError;
 
 impl ErrorMeasure for MaxMinError {
     fn compute(jobs: &[Job]) -> f64 {
-        let max_length: Vec<f64> = jobs.iter().map(|j| j.length.max(j.pred)).collect();
-        let min_length: Vec<f64> = jobs.iter().map(|j| j.length.min(j.pred)).collect();
+        let max_length: Instance = jobs.iter().map(|j| j.length.max(j.pred)).collect();
+        let min_length: Instance = jobs.iter().map(|j| j.length.min(j.pred)).collect();
         spt(&max_length) - spt(&min_length)
     }
 }
