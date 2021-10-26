@@ -12,7 +12,7 @@ def create_arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('file')
     parser.add_argument('-l', '--lambdas', nargs="+", default=[0.0, 0.25, 0.5, 0.75, 1.0])
-    parser.add_argument('--max', action='store_true')
+
 
     return parser
 
@@ -20,38 +20,28 @@ def create_arg_parser():
 def get_data(filename):
     data = pd.read_csv(filename)
     data = data.round(3)
-    data['phase_cr'] = data['phase'] / data['opt']
     data['prr_cr'] = data['prr'] / data['opt']
-    data['simple_error_rel'] = data['simple_error'] / data['opt']
-    data['maxmin_error_rel'] = data['maxmin_error'] / data['opt']
     return data
 
 
 colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan']
 
 
-def plot(df, args, xaxis):
+def plot(df, args):
     plt.figure()
 
     df = df[df['lambda'].isin(args.lambdas)]
-
-    df_phase = df.loc[:, ['lambda', xaxis, 'phase_cr']]
-    df_prr = df.loc[:, ['lambda', xaxis, 'prr_cr']]
+    df_prr = df.loc[:, ['lambda', 'round', 'prr_cr']]
 
     plt.rc('axes', prop_cycle=(cycler('color', colors[0:len(args.lambdas)])))
 
-    grouped_data = df_phase.groupby(['lambda', xaxis]).mean().unstack('lambda')
+    grouped_data = df_prr.groupby(['lambda', 'round']).mean().unstack('lambda')
     for label, l in list(grouped_data):
         grouped_data[(label, l)].plot(
-            style='D-', markersize=4, linewidth=1.2, label=f"phase (λ = {l:1.2f})", legend=True)
-
-    grouped_data = df_prr.groupby(['lambda', xaxis]).mean().unstack('lambda')
-    for label, l in list(grouped_data):
-        grouped_data[(label, l)].plot(
-            style='s:', markersize=4, linewidth=1.2, label=f"PRR (λ = {l:1.2f})", legend=True)
+            style='-', markersize=0, linewidth=1.2, label=f"PRR (λ = {l:1.2f})", legend=True)
 
     #plt.plot((0, max_bin), (1, 1), 'black')
-    plt.xlabel(xaxis)
+    plt.xlabel('round')
     plt.ylabel('Empirical competitive ratio')
     plt.legend()
     plt.tight_layout()
@@ -71,11 +61,8 @@ if __name__ == "__main__":
     if os.path.exists(parsed_args.file):
 
         data = get_data(parsed_args.file)
-        plot(data, parsed_args, 'sigma')
-        plot(data, parsed_args, 'simple_error_rel')
-        plot(data, parsed_args, 'maxmin_error_rel')
-       # plot_lambda(data, float(parsed_args.bin_size),
-       #             parsed_args, det_alg, pred_alg)
+        plot(data, parsed_args)
+
         plt.show()
     else:
         print("Path not valid!")

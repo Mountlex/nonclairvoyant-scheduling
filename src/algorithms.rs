@@ -1,9 +1,6 @@
-use rand::{prelude::SliceRandom, seq::index};
+use rand::{prelude::SliceRandom};
 
-use crate::{
-    instance::Instance,
-    job::{Environment, Job},
-};
+use crate::{instance::Instance, job::{Environment, Job}, prediction::InstancePrediction, sample::create_jobs};
 
 pub fn spt(instance: &Instance) -> f64 {
     let mut jobs = instance.jobs.clone();
@@ -17,7 +14,9 @@ pub fn spt(instance: &Instance) -> f64 {
     obj
 }
 
-pub fn preferrential_rr(mut jobs: Vec<Job>, trustness: f64) -> f64 {
+pub fn preferrential_rr(instance: &Instance, pred: &InstancePrediction, robustification: f64) -> f64 {
+    instance.jobs.iter().for_each(|p| assert!(*p >= 1.0));
+    let mut jobs = create_jobs(&instance, &pred);
     jobs.sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
 
     let mut pred_order_help: Vec<(usize, f64)> =
@@ -31,67 +30,98 @@ pub fn preferrential_rr(mut jobs: Vec<Job>, trustness: f64) -> f64 {
     let mut t: f64 = 0.0;
     let mut obj: f64 = 0.0;
 
+    let mut pred_order_finished: Vec<usize> = vec![];
+
     while n_alive > 0 {
-        if jobs[rr].length == 0.0 {
+        if jobs[rr].length <= 0.0 {
+            if jobs[rr].completed == false && t > 0.0 {
+                panic!("Job length 0 but not finished!")
+            }
             rr += 1;
             continue;
         }
-        if jobs[pred_order[pspt]].length == 0.0 {
+        if jobs[pred_order[pspt]].length <= 0.0 {
+            pred_order_finished.push(pred_order[pspt]);
             pspt += 1;
             continue;
         }
 
         let l;
-        if trustness > 0.0 {
-            l = (jobs[rr].length * (n_alive as f64) / trustness).min(
+        if robustification > 0.0 && robustification < 1.0 {
+            l = (jobs[rr].length * (n_alive as f64) / robustification).min(
                 (jobs[pred_order[pspt]].length * (n_alive as f64))
-                    / ((1.0 - trustness) * (n_alive as f64) + trustness),
+                    / ((n_alive as f64) - (n_alive as f64 - 1.0) * robustification),
             );
-        } else {
+        } else if robustification == 0.0 {
             l = jobs[pred_order[pspt]].length
+        } else {
+            l = jobs[rr].length * (n_alive as f64);
         }
         t += l;
 
-        if trustness > 0.0 {
+        //println!("l = {}, rr = {}, pred = {}", l, jobs[rr].length, jobs[pred_order[pspt]].length);
+        assert!(l >= 0.0);
+
+        if robustification > 0.0 {
             for (i, job) in jobs.iter_mut().enumerate().skip(rr) {
-                if i != pred_order[pspt] {
-                    job.length -= l * trustness / (n_alive as f64);
-                    if job.length == 0.0 {
+                if robustification == 1.0 || (i != pred_order[pspt] && !pred_order_finished.contains(&i))  {
+                    job.length -= l * robustification / (n_alive as f64);
+                    if job.length <= 0.0 {
+                        //println!("rr completed ");
+
                         job.completed = true;
                         n_alive -= 1;
                         obj += t;
-                        rr += 1;
-                    } else if job.completed && i == rr {
-                        rr += 1;
+                        if i == rr {
+                            rr += 1;
+                        } else {
+                            //panic!()
+                        }
+                    }
+                    if job.length < 0.0 {
+                        //panic!("Job length < 0! {}", job.length)
                     }
                 }
             }
         }
 
-        jobs[pred_order[pspt]].length -= l * ((1.0 - trustness) + trustness / (n_alive as f64));
-        if jobs[pred_order[pspt]].length == 0.0 {
-            jobs[pred_order[pspt]].completed = true;
-            n_alive -= 1;
-            obj += t;
-            pspt += 1;
+        if robustification < 1.0 {
+            assert!(jobs[pred_order[pspt]].length >= 0.0);
+            assert!(jobs[pred_order[pspt]].completed == false);
+            if robustification == 0.0 {
+                jobs[pred_order[pspt]].length -= l;
+            } else {
+                jobs[pred_order[pspt]].length -= l * ((1.0 - robustification) + (robustification / (n_alive as f64)));
+                //assert!(jobs[pred_order[pspt]].length >= 0.0);
+            }
+            if jobs[pred_order[pspt]].length <= 0.0 {
+                pred_order_finished.push(pred_order[pspt]);
+                jobs[pred_order[pspt]].completed = true;
+                n_alive -= 1;
+                obj += t;
+                pspt += 1;
+            }
         }
     }
 
     return obj;
 }
 
-pub fn phase_algorithm(jobs: Vec<Job>, trustness: f64) -> f64 {
+pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, mut trustness: f64) -> f64 {
+    trustness += 0.0001;
+    let jobs = create_jobs(&instance, &pred);
+
     let mut env = Environment::new(jobs);
     let delta = 1.0 / 50.0;
 
     while env.nk() as f64 >= (env.n as f64).log2() / (trustness * trustness * trustness) {
-        println!("Estimating the median...");
+        //println!("Estimating the median...");
         let m = median_est(&mut env, delta);
-        println!("Estimated median: {}", m);
-        println!("Estimating the error...");
+       //println!("Estimated median: {}", m);
+        //println!("Estimating the error...");
         let error = error_est(&mut env, trustness, m);
         if error >= (trustness * (delta * delta) * m * env.nk() as f64 * env.nk() as f64) / 16.0 {
-            println!("RR round");
+            //println!("RR round");
             env.jobs
                 .sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
             let mut rr_per_job = 0.0;
@@ -111,7 +141,7 @@ pub fn phase_algorithm(jobs: Vec<Job>, trustness: f64) -> f64 {
             }
             env.clear_completed();
         } else {
-            println!("FtP round");
+            //println!("FtP round");
             env.jobs
                 .sort_by(|j1, j2| j1.pred.partial_cmp(&j2.pred).unwrap());
             for j in 0..env.nk() {
@@ -168,7 +198,7 @@ fn median_est(env: &mut Environment, delta: f64) -> f64 {
     });
     let initial_lengths: Vec<f64> = sample.iter().map(|j| env.jobs[**j].length).collect();
 
-    println!("sample size {}", sample_size);
+    //println!("sample size {}", sample_size);
     //assert_eq!(sample.len(), sample_size);
     let mut rr_per_job = 0.0;
     let mut equal_counter = 1.0;

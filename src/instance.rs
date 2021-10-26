@@ -1,6 +1,6 @@
-use std::iter::FromIterator;
+use std::{iter::FromIterator, ops::Index};
 
-use rand::distributions::Distribution;
+use rand::{distributions::Distribution, prelude::SliceRandom};
 use rand_distr::Pareto;
 
 use crate::Gen;
@@ -11,11 +11,7 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub fn job_len(&self, idx: usize) -> f64 {
-        self.jobs[idx]
-    }
-
-    pub fn num_jobs(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.jobs.len()
     }
 }
@@ -29,6 +25,14 @@ impl From<Vec<f64>> for Instance {
 impl FromIterator<f64> for Instance {
     fn from_iter<T: IntoIterator<Item = f64>>(iter: T) -> Self {
         Instance { jobs: iter.into_iter().collect::<Vec<f64>>()}
+    }
+}
+
+impl Index<usize> for Instance {
+    type Output = f64;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.jobs[index]
     }
 }
 
@@ -52,12 +56,13 @@ impl Gen<InstanceGenParams> for Instance {
         let mut rng = rand::thread_rng();
         let dist = Pareto::new(1.0, params.alpha).unwrap();
         
-        let jobs: Vec<f64> = dist
+        let mut jobs: Vec<f64> = dist
             .sample_iter(&mut rng)
             .take(params.length)
             .map(|j| j as f64)
             .collect();
 
+        jobs.shuffle(&mut rng);
         
         jobs.into()
     }
