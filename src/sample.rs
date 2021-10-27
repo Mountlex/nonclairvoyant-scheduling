@@ -24,7 +24,7 @@ use crate::{
 #[derive(Debug, StructOpt)]
 pub struct Cli {  
 
-    #[structopt(long = "num-lambdas", default_value = "5")]
+    #[structopt(long = "num-lambdas", default_value = "5", global = true)]
     num_lambdas: usize,
 
     #[structopt(
@@ -100,6 +100,7 @@ struct Exp2Entry {
     lambda: f64,
     opt: f64,
     prr: f64,
+    phase: f64,
     round: usize,
 }
 
@@ -185,11 +186,12 @@ impl Cli {
                                 let entries = linspace(0.0, 1.0, self.num_lambdas)
                                     .map(|lambda| {
                                         let prr = preferrential_rr(&instance, &pred, lambda);
-                                        //  let phase = phase_algorithm(&instance, &pred, lambda);
+                                        let phase = phase_algorithm(&instance, &pred, lambda);
                                         Exp2Entry {
                                             lambda,
                                             opt,
                                             prr,
+                                            phase,
                                             round,
                                         }
                                     })

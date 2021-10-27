@@ -7,6 +7,7 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 def create_arg_parser():
     parser = argparse.ArgumentParser()
@@ -21,6 +22,7 @@ def get_data(filename):
     data = pd.read_csv(filename)
     data = data.round(3)
     data['prr_cr'] = data['prr'] / data['opt']
+    data['phase_cr'] = data['phase'] / data['opt']
     return data
 
 
@@ -28,10 +30,11 @@ colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:b
 
 
 def plot(df, args):
-    plt.figure()
+    fig = plt.figure()
 
     df = df[df['lambda'].isin(args.lambdas)]
     df_prr = df.loc[:, ['lambda', 'round', 'prr_cr']]
+    df_phase = df.loc[:, ['lambda', 'round', 'phase_cr']]
 
     plt.rc('axes', prop_cycle=(cycler('color', colors[0:len(args.lambdas)])))
 
@@ -40,7 +43,14 @@ def plot(df, args):
         grouped_data[(label, l)].plot(
             style='-', markersize=0, linewidth=1.2, label=f"PRR (λ = {l:1.2f})", legend=True)
 
+    grouped_data = df_phase.groupby(['lambda', 'round']).mean().unstack('lambda')
+    for label, l in list(grouped_data):
+        grouped_data[(label, l)].plot(
+            style='--', markersize=0, linewidth=1.2, label=f"Phase (λ = {l:1.2f})", legend=True)
+
     #plt.plot((0, max_bin), (1, 1), 'black')
+    ax = fig.gca()
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.xlabel('round')
     plt.ylabel('Empirical competitive ratio')
     plt.legend()

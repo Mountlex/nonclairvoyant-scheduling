@@ -14,10 +14,10 @@ impl Gen<PredGenParams<'_>> for InstancePrediction {
         let mut rng = rand::thread_rng();
         
         let preds: Vec<f64> = params.instance.jobs.iter().map(|job| {
-            let dist = Normal::new(*job, params.sigma).unwrap();
-            let mut p = dist.sample(&mut rng);
+            let dist = Normal::new(0.0, params.sigma).unwrap();
+            let mut p = dist.sample(&mut rng) + *job;
             while p < 1.0 {
-                p = dist.sample(&mut rng);
+                p = dist.sample(&mut rng) + *job;
             }
             p
         }).collect();
