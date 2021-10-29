@@ -30,8 +30,6 @@ pub fn preferrential_rr(instance: &Instance, pred: &InstancePrediction, robustif
     let mut t: f64 = 0.0;
     let mut obj: f64 = 0.0;
 
-    let mut pred_order_finished: Vec<usize> = vec![];
-
     while n_alive > 0 {
         if jobs[rr].length <= 0.0 {
             if jobs[rr].completed == false && t > 0.0 {
@@ -41,7 +39,6 @@ pub fn preferrential_rr(instance: &Instance, pred: &InstancePrediction, robustif
             continue;
         }
         if jobs[pred_order[pspt]].length <= 0.0 {
-            pred_order_finished.push(pred_order[pspt]);
             pspt += 1;
             continue;
         }
@@ -62,43 +59,41 @@ pub fn preferrential_rr(instance: &Instance, pred: &InstancePrediction, robustif
         //println!("l = {}, rr = {}, pred = {}", l, jobs[rr].length, jobs[pred_order[pspt]].length);
         assert!(l >= 0.0);
 
+        let pre_n_alive = n_alive;
+
         if robustification > 0.0 {
             for (i, job) in jobs.iter_mut().enumerate().skip(rr) {
-                if robustification == 1.0 || (i != pred_order[pspt] && !pred_order_finished.contains(&i))  {
-                    job.length -= l * robustification / (n_alive as f64);
+                if robustification == 1.0 || (i != pred_order[pspt])  {
+                    job.length -= l * robustification / (pre_n_alive as f64);
                     if job.length <= 0.0 {
                         //println!("rr completed ");
-
-                        job.completed = true;
-                        n_alive -= 1;
-                        obj += t;
+                        if job.completed == false {
+                            job.completed = true;   
+                            n_alive -= 1;
+                            obj += t;
+                        }
                         if i == rr {
                             rr += 1;
                         } else {
                             //panic!()
                         }
                     }
-                    if job.length < 0.0 {
-                        //panic!("Job length < 0! {}", job.length)
-                    }
                 }
             }
         }
 
         if robustification < 1.0 {
-            assert!(jobs[pred_order[pspt]].length >= 0.0);
-            assert!(jobs[pred_order[pspt]].completed == false);
             if robustification == 0.0 {
                 jobs[pred_order[pspt]].length -= l;
             } else {
-                jobs[pred_order[pspt]].length -= l * ((1.0 - robustification) + (robustification / (n_alive as f64)));
-                //assert!(jobs[pred_order[pspt]].length >= 0.0);
+                jobs[pred_order[pspt]].length -= l * ((1.0 - robustification) + (robustification / (pre_n_alive as f64)));
             }
             if jobs[pred_order[pspt]].length <= 0.0 {
-                pred_order_finished.push(pred_order[pspt]);
-                jobs[pred_order[pspt]].completed = true;
-                n_alive -= 1;
-                obj += t;
+                if jobs[pred_order[pspt]].completed == false {
+                    jobs[pred_order[pspt]].completed = true;
+                    n_alive -= 1;
+                    obj += t;
+                }
                 pspt += 1;
             }
         }
