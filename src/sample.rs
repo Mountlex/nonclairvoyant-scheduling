@@ -139,7 +139,7 @@ impl Cli {
                                                 let prr =
                                                     preferrential_rr(&instance, &pred, lambda);
                                                 let phase =
-                                                    phase_algorithm(&instance, &pred, lambda);
+                                                    phase_algorithm(&instance, &pred, lambda, true);
 
                                                 Entry {
                                                     lambda,
@@ -186,7 +186,7 @@ impl Cli {
                                 let entries = linspace(0.0, 1.0, self.num_lambdas)
                                     .map(|lambda| {
                                         let prr = preferrential_rr(&instance, &pred, lambda);
-                                        let phase = phase_algorithm(&instance, &pred, lambda);
+                                        let phase = phase_algorithm(&instance, &pred, lambda, true);
                                         Exp2Entry {
                                             lambda,
                                             opt,

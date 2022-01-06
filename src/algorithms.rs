@@ -102,7 +102,7 @@ pub fn preferrential_rr(instance: &Instance, pred: &InstancePrediction, robustif
     return obj;
 }
 
-pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, mut trustness: f64) -> f64 {
+pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, mut trustness: f64, expectation: bool) -> f64 {
     trustness += 0.0001;
     let jobs = create_jobs(&instance, &pred);
 
@@ -111,10 +111,10 @@ pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, mut trust
 
     while env.nk() as f64 >= (env.n as f64).log2() / (trustness * trustness * trustness) {
         //println!("Estimating the median...");
-        let m = median_est(&mut env, delta);
+        let m = median_est(&mut env, delta, expectation);
        //println!("Estimated median: {}", m);
         //println!("Estimating the error...");
-        let error = error_est(&mut env, trustness, m);
+        let error = error_est(&mut env, trustness, m, expectation);
         if error >= (trustness * (delta * delta) * m * env.nk() as f64 * env.nk() as f64) / 16.0 {
             //println!("RR round");
             env.jobs
@@ -154,27 +154,39 @@ pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, mut trust
 
     env.jobs
         .sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
-    let mut rr_per_job = 0.0;
-    let mut finished = 0;
-    for j in 0..env.nk() {
-        if env.process(j, rr_per_job) {
-            finished += 1;
-        } else {
-            let amount = env.jobs[j].length;
-            let l = amount * (env.nk() - finished) as f64;
+    if expectation {
+        for j in 0..env.nk() {
+            let l = env.jobs[j].length;
             env.run_for(l);
-            env.complete(j);
-            finished += 1;
-            rr_per_job += amount;
+            env.process(j, l);
         }
+        env.clear_completed();
+    } else {
+        let mut rr_per_job = 0.0;
+        let mut finished = 0;
+        for j in 0..env.nk() {
+            if env.process(j, rr_per_job) {
+                finished += 1;
+            } else {
+                let amount = env.jobs[j].length;
+                let l = amount * (env.nk() - finished) as f64;
+                env.run_for(l);
+                env.complete(j);
+                finished += 1;
+                rr_per_job += amount;
+            }
+        }
+        env.clear_completed();  
     }
-    env.clear_completed();
-
     return env.obj;
 }
 
-fn median_est(env: &mut Environment, delta: f64) -> f64 {
-    let sample_size = ((2.0 * env.n as f64).ln() / (delta * delta)).ceil() as usize;
+fn median_est(env: &mut Environment, delta: f64, expectation: bool) -> f64 {
+    let sample_size = if expectation {
+        ((2.0 * env.nk() as f64).ln() / (delta * delta)).ceil() as usize
+    } else {
+        ((2.0 * env.n as f64).ln() / (delta * delta)).ceil() as usize
+    };
     let indices = (0..env.nk()).collect::<Vec<usize>>();
     //let mut rng = rand::thread_rng();
     // TODO still a bug when sampling with replacement.
@@ -220,8 +232,13 @@ fn median_est(env: &mut Environment, delta: f64) -> f64 {
     0.0
 }
 
-fn error_est(env: &mut Environment, trustness: f64, est_median: f64) -> f64 {
-    let sample_size = ((env.n as f64).ln() / (trustness * trustness)).ceil() as usize;
+fn error_est(env: &mut Environment, trustness: f64, est_median: f64, expectation: bool) -> f64 {
+    let sample_size = if expectation {
+        ((env.nk() as f64).ln() / (trustness * trustness)).ceil() as usize
+    }
+    else {
+        ((env.n as f64).ln() / (trustness * trustness)).ceil() as usize
+    };
     let mut indices = Vec::<(usize, usize)>::new();
     for i in 0..env.nk() {
         for j in i..env.nk() {
