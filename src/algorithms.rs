@@ -102,20 +102,20 @@ pub fn preferrential_rr(instance: &Instance, pred: &InstancePrediction, robustif
     return obj;
 }
 
-pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, mut trustness: f64, expectation: bool) -> f64 {
-    trustness += 0.0001;
+pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, mut robust: f64, expectation: bool) -> f64 {
+    robust += 0.0001;
     let jobs = create_jobs(&instance, &pred);
 
     let mut env = Environment::new(jobs);
     let delta = 1.0 / 50.0;
 
-    while env.nk() as f64 >= (env.n as f64).log2() / (trustness * trustness * trustness) {
+    while env.nk() as f64 >= (env.n as f64).log2() / (robust * robust * robust) {
         //println!("Estimating the median...");
         let m = median_est(&mut env, delta, expectation);
        //println!("Estimated median: {}", m);
         //println!("Estimating the error...");
-        let error = error_est(&mut env, trustness, m, expectation);
-        if error >= (trustness * (delta * delta) * m * env.nk() as f64 * env.nk() as f64) / 16.0 {
+        let error = error_est(&mut env, robust, m, expectation);
+        if error >= (robust * (delta * delta) * m * env.nk() as f64 * env.nk() as f64) / 16.0 {
             //println!("RR round");
             env.jobs
                 .sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
@@ -140,10 +140,10 @@ pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, mut trust
             env.jobs
                 .sort_by(|j1, j2| j1.pred.partial_cmp(&j2.pred).unwrap());
             for j in 0..env.nk() {
-                if env.jobs[j].pred <= (1.0 + trustness) * m {
+                if env.jobs[j].pred <= (1.0 + robust) * m {
                     let l = env.jobs[j]
                         .length
-                        .min(env.jobs[j].pred + 3.0 * trustness * m);
+                        .min(env.jobs[j].pred + 3.0 * robust * m);
                     env.run_for(l);
                     env.process(j, l);
                 }
@@ -152,9 +152,11 @@ pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, mut trust
         }
     }
 
-    env.jobs
-        .sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
+    
     if expectation {
+        env.jobs
+        .sort_by(|j1, j2| j1.pred.partial_cmp(&j2.pred).unwrap());
+
         for j in 0..env.nk() {
             let l = env.jobs[j].length;
             env.run_for(l);
@@ -162,6 +164,9 @@ pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, mut trust
         }
         env.clear_completed();
     } else {
+        env.jobs
+        .sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
+
         let mut rr_per_job = 0.0;
         let mut finished = 0;
         for j in 0..env.nk() {

@@ -17,7 +17,7 @@ use crate::{
     error::{ErrorMeasure, MaxMinError, SimpleError},
     instance::{analyse_instances, Instance, InstanceGenParams},
     job::Job,
-    prediction::{InstancePrediction, PredGenParams},
+    prediction::{InstancePrediction, PredGenParams, ScaledPredGenParams},
     Gen,
 };
 
@@ -139,7 +139,7 @@ impl Cli {
                                                 let prr =
                                                     preferrential_rr(&instance, &pred, lambda);
                                                 let phase =
-                                                    phase_algorithm(&instance, &pred, lambda, true);
+                                                    phase_algorithm(&instance, &pred, lambda, false);
 
                                                 Entry {
                                                     lambda,
@@ -171,8 +171,8 @@ impl Cli {
                             alpha: params.alpha,
                         };
                         let ground_truth: Instance = Instance::generate(&instance_params);
-                        let pred_params = PredGenParams {
-                            sigma: params.sigma,
+                        let pred_params = ScaledPredGenParams {
+                            sigma_scale: params.sigma,
                             instance: &ground_truth,
                         };
                         let mut instances = vec![];
@@ -186,7 +186,7 @@ impl Cli {
                                 let entries = linspace(0.0, 1.0, self.num_lambdas)
                                     .map(|lambda| {
                                         let prr = preferrential_rr(&instance, &pred, lambda);
-                                        let phase = phase_algorithm(&instance, &pred, lambda, true);
+                                        let phase = phase_algorithm(&instance, &pred, lambda, false);
                                         Exp2Entry {
                                             lambda,
                                             opt,

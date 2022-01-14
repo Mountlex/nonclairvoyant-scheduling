@@ -59,10 +59,8 @@ def plot(df, args, xaxis):
 
 
     fig = plt.gcf()
-    fig.set_dpi(500)
-    fig.set_size_inches(4,2.5)
-    # fig.subplots_adjust(right=0.7)
-    #fig.savefig("result.png", dpi=400)
+    fig.set_dpi(290)
+    fig.set_size_inches(3,2)
 
 
 if __name__ == "__main__":
@@ -72,8 +70,6 @@ if __name__ == "__main__":
 
         data = get_data(parsed_args.file)
         plot(data, parsed_args, 'sigma')
-        plot(data, parsed_args, 'simple_error_rel')
-        plot(data, parsed_args, 'maxmin_error_rel')
        # plot_lambda(data, float(parsed_args.bin_size),
        #             parsed_args, det_alg, pred_alg)
         plt.show()
