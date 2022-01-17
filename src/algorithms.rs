@@ -278,6 +278,9 @@ fn error_est(env: &mut Environment, trustness: f64, est_median: f64, expectation
 }
 
 fn sample_with_replacement<T>(set: &[T], sample_size: usize) -> Vec<&T> {
+    if set.is_empty() {
+        return vec![]
+    }
     let mut rng = rand::thread_rng();
     let mut index_sample = Vec::<&T>::with_capacity(sample_size);
     for _ in 0..sample_size {

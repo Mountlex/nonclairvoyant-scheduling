@@ -21,8 +21,7 @@ def create_arg_parser():
 def get_data(filename):
     data = pd.read_csv(filename)
     data = data.round(3)
-    data['prr_cr'] = data['prr'] / data['opt']
-    data['phase_cr'] = data['phase'] / data['opt']
+    data['cr'] = data['alg'] / data['opt']
     return data
 
 
@@ -32,22 +31,30 @@ colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:b
 def plot(df, args):
     fig = plt.figure()
 
-    df = df[df['lambda'].isin(args.lambdas)]
-    df_prr = df.loc[:, ['lambda', 'round', 'prr_cr']]
-    df_phase = df.loc[:, ['lambda', 'round', 'phase_cr']]
+    df_phase = df[df['name'].str.contains("Im")]
+    df_RR = df[df['name'].str.contains("Round-Robin")]
+    df_prr = df[df['name'].str.contains("PRR")]
 
-    plt.rc('axes', prop_cycle=(cycler('color', colors[0:len(args.lambdas)])))
+    df_prr = df_prr.loc[:, ['param', 'cr', 'round']]
+    df_RR = df_RR.loc[:, ['param', 'cr', 'round']]
+    df_phase = df_phase.loc[:, ['param', 'cr', 'round']]
+    plt.rc('axes', prop_cycle=(cycler('color', colors)))
 
-    grouped_data = df_prr.groupby(['lambda', 'round']).mean().unstack('lambda')
-    for label, l in list(grouped_data):
-        grouped_data[(label, l)].plot(
-            style='-', markersize=0, linewidth=1.2, label=f"PRR (λ = {l:1.2f})", legend=True)
+    grouped_data = df_phase.groupby(['param', 'round']).mean().unstack('param')
+    for cr, param in list(grouped_data):
+        grouped_data[(cr,param)].plot(
+            style='D-', markersize=4, linewidth=1.2, label=f"Im et al. (ε = {param})", legend=True)
 
-    grouped_data = df_phase.groupby(['lambda', 'round']).mean().unstack('lambda')
-    for label, l in list(grouped_data):
-        grouped_data[(label, l)].plot(
-            style='--', markersize=0, linewidth=1.2, label=f"Phase (λ = {l:1.2f})", legend=True)
 
+    grouped_data = df_prr.groupby(['param', 'round']).mean().unstack('param')
+    for cr, param in list(grouped_data):
+        grouped_data[(cr,param)].plot(
+            style='s:', markersize=4, linewidth=1.2, label=f"PRR (λ = {param})", legend=True)
+
+    grouped_data = df_RR.groupby(['round']).mean()
+    grouped_data['cr'].plot(style='o--', markersize=4, linewidth=1.2, label=f"Round-Robin", legend=True)
+
+ 
     #plt.plot((0, max_bin), (1, 1), 'black')
     ax = fig.gca()
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))

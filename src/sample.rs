@@ -22,8 +22,7 @@ use crate::{
 };
 
 #[derive(Debug, StructOpt)]
-pub struct Cli {  
-
+pub struct Cli {
     #[structopt(long = "num-lambdas", default_value = "5", global = true)]
     num_lambdas: usize,
 
@@ -47,13 +46,11 @@ enum Experiments {
 }
 #[derive(Debug, Serialize)]
 struct Entry {
-    lambda: f64,
+    name: String,
+    param: f64,
     sigma: f64,
     opt: f64,
-    phase: f64,
-    prr: f64,
-    simple_error: f64,
-    maxmin_error: f64,
+    alg: f64,
 }
 
 #[derive(StructOpt, Debug)]
@@ -97,10 +94,10 @@ struct Exp2Parameters {
 
 #[derive(Debug, Serialize)]
 struct Exp2Entry {
-    lambda: f64,
+    name: String,
+    param: f64,
     opt: f64,
-    prr: f64,
-    phase: f64,
+    alg: f64,
     round: usize,
 }
 
@@ -131,27 +128,47 @@ impl Cli {
                                             instance: &instance,
                                         };
                                         let pred = InstancePrediction::generate(&pred_params);
-                                        let simple_error = SimpleError::compute(&instance, &pred);
-                                        let maxmin_error = MaxMinError::compute(&instance, &pred);
-                                        linspace(0.0, 1.0, self.num_lambdas)
-                                            .map(|lambda| {
-                                                let pred = pred.clone();
-                                                let prr =
-                                                    preferrential_rr(&instance, &pred, lambda);
-                                                let phase =
-                                                    phase_algorithm(&instance, &pred, lambda, false);
+                                        //let simple_error = SimpleError::compute(&instance, &pred);
+                                        //let maxmin_error = MaxMinError::compute(&instance, &pred);
+                                        let mut entries = vec![];
+                                        [0.0, 0.25, 0.5, 0.75].iter().for_each(|lambda| {
+                                            let pred = pred.clone();
+                                            let prr = preferrential_rr(&instance, &pred, *lambda);
 
-                                                Entry {
-                                                    lambda,
+                                            entries.push(Entry {
+                                                name: format!("PRR"),
+                                                param:*lambda,
+                                                sigma,
+                                                opt,
+                                                alg: prr,
+                                            });
+                                        });
+
+                                        entries.push(Entry {
+                                            name: format!("Round-Robin"),
+                                            param:0.0,
+                                            sigma,
+                                            opt,
+                                            alg: preferrential_rr(&instance, &pred, 1.0),
+                                        });
+
+                                        [0.0, 1.0, 2.0, 5.0, 10.0, 20.0].iter().for_each(
+                                            |lambda| {
+                                                let pred = pred.clone();
+                                                let phase = phase_algorithm(
+                                                    &instance, &pred, *lambda, false,
+                                                );
+                                                entries.push(Entry {
+                                                    name: format!("Im et al."),
+                                                    param:*lambda,
                                                     sigma,
                                                     opt,
-                                                    phase,
-                                                    prr,
-                                                    simple_error,
-                                                    maxmin_error,
-                                                }
-                                            })
-                                            .collect::<Vec<Entry>>()
+                                                    alg: phase,
+                                                });
+                                            },
+                                        );
+
+                                        entries
                                     })
                                     .collect::<Vec<Entry>>()
                             })
@@ -181,21 +198,46 @@ impl Cli {
                             .flat_map(|round| {
                                 let pred = create_mean_instance(&instances, params.instance_length);
                                 let instance = InstancePrediction::generate(&pred_params);
-                                
+
                                 let opt = spt(&instance);
-                                let entries = linspace(0.0, 1.0, self.num_lambdas)
-                                    .map(|lambda| {
-                                        let prr = preferrential_rr(&instance, &pred, lambda);
-                                        let phase = phase_algorithm(&instance, &pred, lambda, false);
-                                        Exp2Entry {
-                                            lambda,
-                                            opt,
-                                            prr,
-                                            phase,
+                                let mut entries = vec![];
+                                        [0.0, 0.25, 0.5, 0.75].iter().for_each(|lambda| {
+                                            let pred = pred.clone();
+                                            let prr = preferrential_rr(&instance, &pred, *lambda);
+
+                                            entries.push(Exp2Entry {
+                                                name: format!("PRR"),
+                                                param:*lambda,
+                                                round,
+                                                opt,
+                                                alg: prr,
+                                            });
+                                        });
+
+                                        entries.push(Exp2Entry {
+                                            name: format!("Round-Robin"),
+                                            param:0.0,
                                             round,
-                                        }
-                                    })
-                                    .collect::<Vec<Exp2Entry>>();
+                                            opt,
+                                            alg: preferrential_rr(&instance, &pred, 1.0),
+                                        });
+
+                                        [0.0, 1.0, 2.0, 5.0, 10.0, 20.0].iter().for_each(
+                                            |lambda| {
+                                                let pred = pred.clone();
+                                                let phase = phase_algorithm(
+                                                    &instance, &pred, *lambda, false,
+                                                );
+                                                entries.push(Exp2Entry {
+                                                    name: format!("Im et al."),
+                                                    param:*lambda,
+                                                    round,
+                                                    opt,
+                                                    alg: phase,
+                                                });
+                                            },
+                                        );
+
                                 instances.push(instance);
                                 entries
                             })
@@ -222,13 +264,13 @@ fn create_mean_instance(instances: &[Instance], instance_length: usize) -> Insta
         Instance { jobs: lengths }
     } else {
         let mut rng = rand::thread_rng();
-        
-        Instance {      
+
+        Instance {
             jobs: Uniform::new(1.0, 100.0)
-            .sample_iter(&mut rng)
-            .take(instance_length)
-            .map(|j| j as f64)
-            .collect(),
+                .sample_iter(&mut rng)
+                .take(instance_length)
+                .map(|j| j as f64)
+                .collect(),
         }
     }
 }

@@ -4,6 +4,7 @@ from cycler import cycler
 import argparse
 import sys
 import os
+import seaborn as sns
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,36 +21,55 @@ def create_arg_parser():
 def get_data(filename):
     data = pd.read_csv(filename)
     data = data.round(3)
-    data['phase_cr'] = data['phase'] / data['opt']
-    data['prr_cr'] = data['prr'] / data['opt']
-    data['simple_error_rel'] = data['simple_error'] / data['opt']
-    data['maxmin_error_rel'] = data['maxmin_error'] / data['opt']
+    data['cr'] = data['alg'] / data['opt']
     return data
 
 
-colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan']
+colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown','tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
 
 
 def plot(df, args, xaxis):
     plt.figure()
 
-    df = df[df['lambda'].isin(args.lambdas)]
+    df_phase = df[df['name'].str.contains("Im")]
+    df_RR = df[df['name'].str.contains("Round-Robin")]
+    df_prr = df[df['name'].str.contains("PRR")]
 
-    df_phase = df.loc[:, ['lambda', xaxis, 'phase_cr']]
-    df_prr = df.loc[:, ['lambda', xaxis, 'prr_cr']]
+    df_prr = df_prr.loc[:, ['name','param', 'cr', xaxis]]
+    df_RR = df_RR.loc[:, ['name', 'cr', xaxis]]
+    df_phase = df_phase.loc[:, ['name', 'param', 'cr', xaxis]]
 
-    plt.rc('axes', prop_cycle=(cycler('color', colors[0:len(args.lambdas)])))
+    df_prr['param'] = df_prr['param'].map('PRR (λ = {})'.format)
+    df_prr['param'] = df_prr['param'].map('PRR (λ = {})'.format)
+    df_phase['param'] = df_phase['param'].map('Im et al. (ε = {})'.format)
 
-    grouped_data = df_phase.groupby(['lambda', xaxis]).mean().unstack('lambda')
-    for label, l in list(grouped_data):
-        grouped_data[(label, l)].plot(
-            style='D-', markersize=4, linewidth=1.2, label=f"phase (λ = {l:1.2f})", legend=True)
+    #plt.rc('axes', prop_cycle=(cycler('color', colors)))
 
-    grouped_data = df_prr.groupby(['lambda', xaxis]).mean().unstack('lambda')
-    for label, l in list(grouped_data):
-        grouped_data[(label, l)].plot(
-            style='s:', markersize=4, linewidth=1.2, label=f"PRR (λ = {l:1.2f})", legend=True)
 
+    sns.set_theme(style='white')
+
+
+    sns.lineplot(data=df_phase, x="sigma", y="cr", hue='param', linestyle=':', markers=True)
+
+    sns.lineplot(data=df_RR, x="sigma", y="cr", label="Round-Robin")
+
+    sns.lineplot(data=df_prr, x="sigma", y="cr", hue="param", linestyle='--', markers=True)
+
+    
+    #grouped_data = df_phase.groupby(['param', xaxis]).mean().unstack('param')
+    #for cr, param in list(grouped_data):
+        #grouped_data[(cr,param)].plot(
+        #    style='D-', markersize=4, linewidth=1.2, label=f"Im et al. (ε = {param})", legend=True)
+
+    #grouped_data = df_prr.groupby(['param', xaxis]).mean().unstack('param')
+    #for cr, param in list(grouped_data):
+    #    grouped_data[(cr,param)].plot(
+    #        style='s:', markersize=4, linewidth=1.2, label=f"PRR (λ = {param})", legend=True)
+
+    #grouped_data = df_RR.groupby([xaxis]).mean()
+    #grouped_data['cr'].plot(style='o--', markersize=4, linewidth=1.2, label=f"Round-Robin", legend=True)
+
+ 
     #plt.plot((0, max_bin), (1, 1), 'black')
     plt.xlabel(xaxis)
     plt.ylabel('Empirical competitive ratio')
