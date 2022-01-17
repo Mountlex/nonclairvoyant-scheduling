@@ -40,7 +40,7 @@ def plot(filename, save):
     df['cr'] = df['alg'] / df['opt']
     df['param'] = df[['name','param']].apply(lambda x: legend(*x),axis=1)
 
-    ax = sns.lineplot(data=df, x=x_name, y="cr", hue='param', style='name',markers=True)
+    ax = sns.lineplot(data=df, x=x_name, y="cr", hue='param', style='name',markers=True, linewidth=1.2)
     plt.legend(labels=df['param'].unique())
     
     if x_name == 'round':
@@ -52,7 +52,7 @@ def plot(filename, save):
     plt.tight_layout()
 
     fig = plt.gcf()
-    fig.set_dpi(300)
+    fig.set_dpi(350)
     fig.set_size_inches(8,5)
 
     if save:
