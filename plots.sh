@@ -8,3 +8,4 @@
 
 ./plot exp2_rs1.csv    --save
 ./plot exp2_rs10.csv   --save
+./plot exp2_rs100.csv   --save

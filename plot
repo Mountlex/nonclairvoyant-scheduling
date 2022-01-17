@@ -52,7 +52,7 @@ def plot(filename, save):
     plt.tight_layout()
 
     fig = plt.gcf()
-    fig.set_dpi(350)
+    fig.set_dpi(400)
     fig.set_size_inches(8,5)
 
     if save:

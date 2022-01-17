@@ -204,7 +204,7 @@ impl Cli {
                         (0..params.timesteps)
                             .into_iter()
                             .flat_map(|round| {
-                                let pred = create_mean_instance(&instances, params.instance_length);
+                                let pred = create_mean_instance(&instances, params.instance_length, params.alpha);
                                 let instance: Instance = if params.rel_sigma {
                                     InstancePrediction::generate(&ScaledPredGenParams {
                                         sigma_scale: params.sigma,
@@ -269,7 +269,7 @@ impl Cli {
     }
 }
 
-fn create_mean_instance(instances: &[Instance], instance_length: usize) -> Instance {
+fn create_mean_instance(instances: &[Instance], instance_length: usize, alpha: f64) -> Instance {
     if instances.len() > 0 {
         let mut lengths: Vec<f64> = Vec::with_capacity(instances.first().unwrap().len());
         for i in 0..instances.first().unwrap().len() {
@@ -282,15 +282,11 @@ fn create_mean_instance(instances: &[Instance], instance_length: usize) -> Insta
         }
         Instance { jobs: lengths }
     } else {
-        let mut rng = rand::thread_rng();
-
-        Instance {
-            jobs: Uniform::new(1.0, 100.0)
-                .sample_iter(&mut rng)
-                .take(instance_length)
-                .map(|j| j as f64)
-                .collect(),
-        }
+        let instance_params = InstanceGenParams {
+            length: instance_length,
+            alpha: alpha,
+        };
+        Instance::generate(&instance_params)
     }
 }
 
