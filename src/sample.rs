@@ -70,6 +70,9 @@ struct Exp1Parameters {
     #[structopt(long = "num-sigma", default_value = "10")]
     num_sigmas: usize,
 
+    #[structopt(long)]
+    rel_sigma: bool,
+
     #[structopt(short, long = "alpha", default_value = "1.1")]
     alpha: f64,
 }
@@ -87,6 +90,9 @@ struct Exp2Parameters {
 
     #[structopt(short, long = "sigma", default_value = "1.0")]
     sigma: f64,
+
+    #[structopt(long)]
+    rel_sigma: bool,
 
     #[structopt(short = "l", long, default_value = "1000")]
     instance_length: usize,
@@ -123,15 +129,21 @@ impl Cli {
                                 let sigma = params.step_sigma * sigma_num as f64;
                                 (0..params.num_preds)
                                     .flat_map(|_| {
-                                        let pred_params = PredGenParams {
-                                            sigma,
-                                            instance: &instance,
+                                        let pred: Instance = if params.rel_sigma {
+                                            InstancePrediction::generate(&ScaledPredGenParams {
+                                                sigma_scale: sigma,
+                                                instance: &instance,
+                                            })
+                                        } else {
+                                            InstancePrediction::generate(&PredGenParams {
+                                                sigma: sigma,
+                                                instance: &instance,
+                                            })
                                         };
-                                        let pred = InstancePrediction::generate(&pred_params);
                                         //let simple_error = SimpleError::compute(&instance, &pred);
                                         //let maxmin_error = MaxMinError::compute(&instance, &pred);
                                         let mut entries = vec![];
-                                        [0.0, 0.25, 0.5, 0.75].iter().for_each(|lambda| {
+                                        [0.1, 0.5, 0.75].iter().for_each(|lambda| {
                                             let pred = pred.clone();
                                             let prr = preferrential_rr(&instance, &pred, *lambda);
 
@@ -152,7 +164,7 @@ impl Cli {
                                             alg: preferrential_rr(&instance, &pred, 1.0),
                                         });
 
-                                        [0.0, 1.0, 2.0, 5.0, 10.0, 20.0].iter().for_each(
+                                        [0.1, 1.0, 5.0].iter().for_each(
                                             |lambda| {
                                                 let pred = pred.clone();
                                                 let phase = phase_algorithm(
@@ -188,20 +200,27 @@ impl Cli {
                             alpha: params.alpha,
                         };
                         let ground_truth: Instance = Instance::generate(&instance_params);
-                        let pred_params = ScaledPredGenParams {
-                            sigma_scale: params.sigma,
-                            instance: &ground_truth,
-                        };
                         let mut instances = vec![];
                         (0..params.timesteps)
                             .into_iter()
                             .flat_map(|round| {
                                 let pred = create_mean_instance(&instances, params.instance_length);
-                                let instance = InstancePrediction::generate(&pred_params);
+                                let instance: Instance = if params.rel_sigma {
+                                    InstancePrediction::generate(&ScaledPredGenParams {
+                                        sigma_scale: params.sigma,
+                                        instance: &ground_truth,
+                                    })
+                                } else {
+                                    InstancePrediction::generate(&PredGenParams {
+                                        sigma: params.sigma,
+                                        instance: &ground_truth,
+                                    })
+                                };
+                                    
 
                                 let opt = spt(&instance);
                                 let mut entries = vec![];
-                                        [0.0, 0.25, 0.5, 0.75].iter().for_each(|lambda| {
+                                        [0.1, 0.5, 0.75].iter().for_each(|lambda| {
                                             let pred = pred.clone();
                                             let prr = preferrential_rr(&instance, &pred, *lambda);
 
@@ -222,7 +241,7 @@ impl Cli {
                                             alg: preferrential_rr(&instance, &pred, 1.0),
                                         });
 
-                                        [0.0, 1.0, 2.0, 5.0, 10.0, 20.0].iter().for_each(
+                                        [0.1, 1.0, 5.0].iter().for_each(
                                             |lambda| {
                                                 let pred = pred.clone();
                                                 let phase = phase_algorithm(

@@ -8,79 +8,59 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 def create_arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('file')
-    parser.add_argument('-l', '--lambdas', nargs="+", default=[0.0, 0.25, 0.5, 0.75, 1.0])
-    parser.add_argument('--max', action='store_true')
+    parser.add_argument('--save', action='store_true')
 
     return parser
 
 
-def get_data(filename):
-    data = pd.read_csv(filename)
-    data = data.round(3)
-    data['cr'] = data['alg'] / data['opt']
-    return data
 
+def legend(name, param):
+    if "Im" in name:
+        return f"Im et al. (ε = {param})"
+    elif "PRR" in name:
+        return f"PRR (λ = {param})"
+    else:
+        return "Round-Robin"
 
-colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown','tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
+def plot(filename, save):
+    if "exp1" in filename:
+        x_name = "sigma"
+    else:
+        x_name = "round"
 
+    sns.set_theme(style='ticks')
 
-def plot(df, args, xaxis):
-    plt.figure()
+    df = pd.read_csv(filename)
+    df = df.round(3)
+    df['cr'] = df['alg'] / df['opt']
+    df['param'] = df[['name','param']].apply(lambda x: legend(*x),axis=1)
 
-    df_phase = df[df['name'].str.contains("Im")]
-    df_RR = df[df['name'].str.contains("Round-Robin")]
-    df_prr = df[df['name'].str.contains("PRR")]
-
-    df_prr = df_prr.loc[:, ['name','param', 'cr', xaxis]]
-    df_RR = df_RR.loc[:, ['name', 'cr', xaxis]]
-    df_phase = df_phase.loc[:, ['name', 'param', 'cr', xaxis]]
-
-    df_prr['param'] = df_prr['param'].map('PRR (λ = {})'.format)
-    df_prr['param'] = df_prr['param'].map('PRR (λ = {})'.format)
-    df_phase['param'] = df_phase['param'].map('Im et al. (ε = {})'.format)
-
-    #plt.rc('axes', prop_cycle=(cycler('color', colors)))
-
-
-    sns.set_theme(style='white')
-
-
-    sns.lineplot(data=df_phase, x="sigma", y="cr", hue='param', linestyle=':', markers=True)
-
-    sns.lineplot(data=df_RR, x="sigma", y="cr", label="Round-Robin")
-
-    sns.lineplot(data=df_prr, x="sigma", y="cr", hue="param", linestyle='--', markers=True)
-
+    ax = sns.lineplot(data=df, x=x_name, y="cr", hue='param', style='name',markers=True)
+    plt.legend(labels=df['param'].unique())
     
-    #grouped_data = df_phase.groupby(['param', xaxis]).mean().unstack('param')
-    #for cr, param in list(grouped_data):
-        #grouped_data[(cr,param)].plot(
-        #    style='D-', markersize=4, linewidth=1.2, label=f"Im et al. (ε = {param})", legend=True)
+    if x_name == 'round':
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    #grouped_data = df_prr.groupby(['param', xaxis]).mean().unstack('param')
-    #for cr, param in list(grouped_data):
-    #    grouped_data[(cr,param)].plot(
-    #        style='s:', markersize=4, linewidth=1.2, label=f"PRR (λ = {param})", legend=True)
-
-    #grouped_data = df_RR.groupby([xaxis]).mean()
-    #grouped_data['cr'].plot(style='o--', markersize=4, linewidth=1.2, label=f"Round-Robin", legend=True)
-
- 
-    #plt.plot((0, max_bin), (1, 1), 'black')
-    plt.xlabel(xaxis)
+  
+    plt.xlabel(x_name)
     plt.ylabel('Empirical competitive ratio')
-    plt.legend()
     plt.tight_layout()
-    #plt.axis([0, max_bin, 0.99, 1.1])
-
 
     fig = plt.gcf()
-    fig.set_dpi(290)
-    fig.set_size_inches(3,2)
+    fig.set_dpi(300)
+    fig.set_size_inches(8,5)
+
+    if save:
+        f = filename.split(".")[0]
+        plt.savefig(f"{f}.pdf")
+    else:
+        plt.show()
+
 
 
 if __name__ == "__main__":
@@ -88,10 +68,6 @@ if __name__ == "__main__":
     parsed_args = arg_parser.parse_args(sys.argv[1:])
     if os.path.exists(parsed_args.file):
 
-        data = get_data(parsed_args.file)
-        plot(data, parsed_args, 'sigma')
-       # plot_lambda(data, float(parsed_args.bin_size),
-       #             parsed_args, det_alg, pred_alg)
-        plt.show()
+        plot(parsed_args.file, parsed_args.save)
     else:
         print("Path not valid!")
