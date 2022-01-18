@@ -156,13 +156,7 @@ impl Cli {
                                             });
                                         });
 
-                                        entries.push(Entry {
-                                            name: format!("Round-Robin"),
-                                            param:0.0,
-                                            sigma,
-                                            opt,
-                                            alg: preferrential_rr(&instance, &pred, 1.0),
-                                        });
+                                        
 
                                         [0.1, 1.0, 5.0].iter().for_each(
                                             |lambda| {
@@ -180,6 +174,13 @@ impl Cli {
                                             },
                                         );
 
+                                        entries.push(Entry {
+                                            name: format!("Round-Robin"),
+                                            param:0.0,
+                                            sigma,
+                                            opt,
+                                            alg: preferrential_rr(&instance, &pred, 1.0),
+                                        });
                                         entries
                                     })
                                     .collect::<Vec<Entry>>()
@@ -233,14 +234,7 @@ impl Cli {
                                             });
                                         });
 
-                                        entries.push(Exp2Entry {
-                                            name: format!("Round-Robin"),
-                                            param:0.0,
-                                            round,
-                                            opt,
-                                            alg: preferrential_rr(&instance, &pred, 1.0),
-                                        });
-
+                                       
                                         [0.1, 1.0, 5.0].iter().for_each(
                                             |lambda| {
                                                 let pred = pred.clone();
@@ -256,6 +250,15 @@ impl Cli {
                                                 });
                                             },
                                         );
+
+                                        entries.push(Exp2Entry {
+                                            name: format!("Round-Robin"),
+                                            param:0.0,
+                                            round,
+                                            opt,
+                                            alg: preferrential_rr(&instance, &pred, 1.0),
+                                        });
+
 
                                 instances.push(instance);
                                 entries
