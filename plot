@@ -48,7 +48,7 @@ def plot(filename, save):
     if x_name == 'round':
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-  
+
     plt.xlabel(x_name)
     plt.ylabel('Empirical competitive ratio')
     plt.tight_layout()
