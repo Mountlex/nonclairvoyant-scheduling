@@ -16,6 +16,8 @@ itertools-num = "0.1.3"
 csv = "1.1"
 serde = { version = "1", features = ["derive"] }
 anyhow = "1.0.37"
+num-integer = "0.1.44"
+
 
 [profile.release]
 debug = true

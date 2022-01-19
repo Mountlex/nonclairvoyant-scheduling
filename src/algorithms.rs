@@ -1,6 +1,6 @@
 use rand::{prelude::SliceRandom};
 
-use crate::{instance::Instance, job::{Environment, Job}, prediction::InstancePrediction, sample::create_jobs};
+use crate::{instance::Instance, job::{Environment}, prediction::InstancePrediction, sample::create_jobs};
 
 pub fn spt(instance: &Instance) -> f64 {
     let mut jobs = instance.jobs.clone();
@@ -102,8 +102,113 @@ pub fn preferrential_rr(instance: &Instance, pred: &InstancePrediction, robustif
     return obj;
 }
 
-pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, mut robust: f64, expectation: bool) -> f64 {
-    robust += 0.0001;
+pub fn two_stage_schedule(instance: &Instance, pred: &InstancePrediction, lambda: f64) -> f64 {
+    let mut jobs = create_jobs(&instance, &pred);
+    jobs.sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
+
+    let opt_y = spt(pred);
+
+    let mut n_alive = jobs.len();
+    let mut rr: usize = 0;
+    let mut t: f64 = 0.0;
+    let mut obj: f64 = 0.0;
+
+    let mut misprediction_detected = false;
+
+    let max_rr = lambda * instance.len() as f64 * opt_y
+        / num_integer::binomial(instance.len(), 2) as f64;
+
+
+    // RR until time == max_rr
+    while n_alive > 0 && !misprediction_detected && t < max_rr{
+        assert!(rr < jobs.len());
+        if jobs[rr].length <= 0.0 {
+            if jobs[rr].completed == false && t > 0.0 {
+                panic!("Job length 0 but not finished!")
+            }
+            rr += 1;
+            continue;
+        }
+
+        let l = (jobs[rr].length * (n_alive as f64)).min(max_rr - t);
+        t += l;
+        let pre_n_alive = n_alive;
+        for (i, job) in jobs.iter_mut().enumerate().skip(rr) {
+            job.length -= l / (pre_n_alive as f64);
+            if job.length <= 0.0 {                
+                if job.completed == false {
+                    job.completed = true;   
+                    n_alive -= 1;
+                    obj += t;
+                    
+                    if instance[job.id] != pred[job.id] {
+                        misprediction_detected = true;
+                    }
+                }
+                if i == rr {
+                    rr += 1;
+                } 
+            }
+        }
+        
+    }
+
+    assert!(t <= max_rr || !misprediction_detected);
+     
+    // Schedule remaining jobs in predicted order; break if a misprediction is being detected.
+    jobs.sort_by(|j1, j2| j1.pred.partial_cmp(&j2.pred).unwrap());
+    let mut idx = 0;
+    while !misprediction_detected && idx < jobs.len() {
+        if !jobs[idx].completed {
+            t += jobs[idx].length;
+            obj += t;
+            jobs[idx].length = 0.0;
+            jobs[idx].completed = true;
+            n_alive -= 1;
+            if instance[jobs[idx].id] != pred[jobs[idx].id] {
+                misprediction_detected = true;
+            }
+        }
+        idx += 1;
+    }
+
+    // RR until all jobs finish.
+    jobs.sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
+    rr = 0;
+    while n_alive > 0 {
+        assert!(rr < jobs.len());
+        if jobs[rr].length <= 0.0 {
+            if jobs[rr].completed == false && t > 0.0 {
+                panic!("Job length 0 but not finished!")
+            }
+            rr += 1;
+            continue;
+        }
+
+        let l = jobs[rr].length * (n_alive as f64);
+        t += l;
+        let pre_n_alive = n_alive;
+        for (i, job) in jobs.iter_mut().enumerate().skip(rr) {
+            job.length -= l / (pre_n_alive as f64);
+            if job.length <= 0.0 {                
+                if job.completed == false {
+                    job.completed = true;   
+                    n_alive -= 1;
+                    obj += t;
+                }
+                if i == rr {
+                     rr += 1;
+                } 
+            }
+        }
+    }
+
+    obj
+}
+
+
+
+pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, robust: f64, expectation: bool) -> f64 {
     let jobs = create_jobs(&instance, &pred);
 
     let mut env = Environment::new(jobs);

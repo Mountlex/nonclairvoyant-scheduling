@@ -1,4 +1,4 @@
-use crate::{algorithms::spt, instance::Instance, job, prediction::{InstancePrediction, PermutationPrediction}};
+use crate::{algorithms::spt, instance::Instance, prediction::{InstancePrediction, PermutationPrediction}};
 
 
 pub trait ErrorMeasure<P> {

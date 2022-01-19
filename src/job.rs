@@ -4,7 +4,7 @@ pub struct Job {
     pub length: f64,
     pub pred: f64,
     pub completed: bool,
-    id: usize,
+    pub id: usize,
 }
 
 impl Job {

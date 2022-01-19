@@ -24,6 +24,8 @@ def legend(name, param):
         return f"Im et al. (ε = {param})"
     elif "PRR" in name:
         return f"PRR (λ = {param})"
+    elif "Two" in name:
+        return f"Two-Stage (λ = {param})"
     else:
         return "Round-Robin"
 
@@ -40,8 +42,8 @@ def plot(filename, save):
     df['cr'] = df['alg'] / df['opt']
     df['param'] = df[['name','param']].apply(lambda x: legend(*x),axis=1)
 
-    ax = sns.lineplot(data=df, x=x_name, y="cr", hue='param', style='name',markers=True, linewidth=1.2)
-    plt.legend(labels=df['param'].unique())
+    ax = sns.lineplot(data=df, x=x_name, y="cr", hue='param', style='name',markers=("round" in list(df)), linewidth=1.2)
+    plt.legend(labels=df['param'].unique(),ncol=2)
     
     if x_name == 'round':
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))

@@ -4,17 +4,12 @@ use std::path::PathBuf;
 use anyhow::Result;
 use csv::Writer;
 use indicatif::ParallelProgressIterator;
-use itertools_num::linspace;
-use rand_distr::Distribution;
 use rayon::prelude::*;
 use serde::Serialize;
 use structopt::StructOpt;
 
-use rand::distributions::Uniform;
-
 use crate::{
-    algorithms::{phase_algorithm, preferrential_rr, spt},
-    error::{ErrorMeasure, MaxMinError, SimpleError},
+    algorithms::{phase_algorithm, preferrential_rr, spt, two_stage_schedule},
     instance::{analyse_instances, Instance, InstanceGenParams},
     job::Job,
     prediction::{InstancePrediction, PredGenParams, ScaledPredGenParams},
@@ -23,9 +18,6 @@ use crate::{
 
 #[derive(Debug, StructOpt)]
 pub struct Cli {
-    #[structopt(long = "num-lambdas", default_value = "5", global = true)]
-    num_lambdas: usize,
-
     #[structopt(
         short,
         long,
@@ -144,39 +136,41 @@ impl Cli {
                                         //let maxmin_error = MaxMinError::compute(&instance, &pred);
                                         let mut entries = vec![];
                                         [0.1, 0.5, 0.75].iter().for_each(|lambda| {
-                                            let pred = pred.clone();
-                                            let prr = preferrential_rr(&instance, &pred, *lambda);
-
                                             entries.push(Entry {
                                                 name: format!("PRR"),
-                                                param:*lambda,
+                                                param: *lambda,
                                                 sigma,
                                                 opt,
-                                                alg: prr,
+                                                alg: preferrential_rr(&instance, &pred, *lambda),
                                             });
                                         });
 
-                                        
+                                        [0.1, 0.5, 0.75].iter().for_each(|lambda| {
+                                            entries.push(Entry {
+                                                name: format!("TwoStage"),
+                                                param: *lambda,
+                                                sigma,
+                                                opt,
+                                                alg: two_stage_schedule(&instance, &pred, *lambda),
+                                            });
+                                        });
 
-                                        [0.1, 1.0, 5.0].iter().for_each(
-                                            |lambda| {
-                                                let pred = pred.clone();
-                                                let phase = phase_algorithm(
-                                                    &instance, &pred, *lambda, false,
-                                                );
-                                                entries.push(Entry {
-                                                    name: format!("Im et al."),
-                                                    param:*lambda,
-                                                    sigma,
-                                                    opt,
-                                                    alg: phase,
-                                                });
-                                            },
-                                        );
+                                        [0.1, 1.0, 5.0].iter().for_each(|lambda| {
+                                            let pred = pred.clone();
+                                            let phase =
+                                                phase_algorithm(&instance, &pred, *lambda, false);
+                                            entries.push(Entry {
+                                                name: format!("Im et al."),
+                                                param: *lambda,
+                                                sigma,
+                                                opt,
+                                                alg: phase,
+                                            });
+                                        });
 
                                         entries.push(Entry {
                                             name: format!("Round-Robin"),
-                                            param:0.0,
+                                            param: 0.0,
                                             sigma,
                                             opt,
                                             alg: preferrential_rr(&instance, &pred, 1.0),
@@ -205,7 +199,11 @@ impl Cli {
                         (0..params.timesteps)
                             .into_iter()
                             .flat_map(|round| {
-                                let pred = create_mean_instance(&instances, params.instance_length, params.alpha);
+                                let pred = create_mean_instance(
+                                    &instances,
+                                    params.instance_length,
+                                    params.alpha,
+                                );
                                 let instance: Instance = if params.rel_sigma {
                                     InstancePrediction::generate(&ScaledPredGenParams {
                                         sigma_scale: params.sigma,
@@ -217,48 +215,49 @@ impl Cli {
                                         instance: &ground_truth,
                                     })
                                 };
-                                    
 
                                 let opt = spt(&instance);
                                 let mut entries = vec![];
-                                        [0.1, 0.5, 0.75].iter().for_each(|lambda| {
-                                            let pred = pred.clone();
-                                            let prr = preferrential_rr(&instance, &pred, *lambda);
 
-                                            entries.push(Exp2Entry {
-                                                name: format!("PRR"),
-                                                param:*lambda,
-                                                round,
-                                                opt,
-                                                alg: prr,
-                                            });
-                                        });
+                                [0.1, 0.5, 0.75].iter().for_each(|lambda| {
+                                    entries.push(Exp2Entry {
+                                        name: format!("PRR"),
+                                        param: *lambda,
+                                        round,
+                                        opt,
+                                        alg: preferrential_rr(&instance, &pred, *lambda),
+                                    });
+                                });
 
-                                       
-                                        [0.1, 1.0, 5.0].iter().for_each(
-                                            |lambda| {
-                                                let pred = pred.clone();
-                                                let phase = phase_algorithm(
-                                                    &instance, &pred, *lambda, false,
-                                                );
-                                                entries.push(Exp2Entry {
-                                                    name: format!("Im et al."),
-                                                    param:*lambda,
-                                                    round,
-                                                    opt,
-                                                    alg: phase,
-                                                });
-                                            },
-                                        );
+                                [0.1, 0.5, 0.75].iter().for_each(|lambda| {
+                                    entries.push(Exp2Entry {
+                                        name: format!("TwoStage"),
+                                        param: *lambda,
+                                        round,
+                                        opt,
+                                        alg: two_stage_schedule(&instance, &pred, *lambda),
+                                    });
+                                });
 
-                                        entries.push(Exp2Entry {
-                                            name: format!("Round-Robin"),
-                                            param:0.0,
-                                            round,
-                                            opt,
-                                            alg: preferrential_rr(&instance, &pred, 1.0),
-                                        });
+                                [0.1, 1.0, 5.0].iter().for_each(|lambda| {
+                                    let pred = pred.clone();
+                                    let phase = phase_algorithm(&instance, &pred, *lambda, false);
+                                    entries.push(Exp2Entry {
+                                        name: format!("Im et al."),
+                                        param: *lambda,
+                                        round,
+                                        opt,
+                                        alg: phase,
+                                    });
+                                });
 
+                                entries.push(Exp2Entry {
+                                    name: format!("Round-Robin"),
+                                    param: 0.0,
+                                    round,
+                                    opt,
+                                    alg: preferrential_rr(&instance, &pred, 1.0),
+                                });
 
                                 instances.push(instance);
                                 entries
