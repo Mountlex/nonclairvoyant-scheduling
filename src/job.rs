@@ -1,4 +1,3 @@
-
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Job {
     pub length: f64,
@@ -10,7 +9,10 @@ pub struct Job {
 impl Job {
     pub fn new(id: usize, length: f64, pred: f64) -> Self {
         Job {
-            id, length, pred, completed: false
+            id,
+            length,
+            pred,
+            completed: false,
         }
     }
 }
@@ -25,7 +27,10 @@ pub struct Environment {
 impl Environment {
     pub fn new(jobs: Vec<Job>) -> Self {
         Environment {
-            time: 0.0, obj: 0.0, n:jobs.len(), jobs
+            time: 0.0,
+            obj: 0.0,
+            n: jobs.len(),
+            jobs,
         }
     }
 
@@ -55,7 +60,7 @@ impl Environment {
         if let Some(job) = self.jobs.get_mut(job_idx) {
             job.completed = true;
             job.length = 0.0;
-            self.obj += self.time;          
+            self.obj += self.time;
         }
     }
 

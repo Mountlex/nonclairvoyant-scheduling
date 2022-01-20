@@ -1,6 +1,8 @@
-use rand::{prelude::SliceRandom};
+use rand::prelude::SliceRandom;
 
-use crate::{instance::Instance, job::{Environment}, prediction::InstancePrediction, sample::create_jobs};
+use crate::{
+    instance::Instance, job::Environment, prediction::InstancePrediction, sample::create_jobs,
+};
 
 pub fn spt(instance: &Instance) -> f64 {
     let mut jobs = instance.jobs.clone();
@@ -14,7 +16,11 @@ pub fn spt(instance: &Instance) -> f64 {
     obj
 }
 
-pub fn preferrential_rr(instance: &Instance, pred: &InstancePrediction, robustification: f64) -> f64 {
+pub fn preferrential_rr(
+    instance: &Instance,
+    pred: &InstancePrediction,
+    robustification: f64,
+) -> f64 {
     instance.jobs.iter().for_each(|p| assert!(*p >= 1.0));
     let mut jobs = create_jobs(&instance, &pred);
     jobs.sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
@@ -63,12 +69,12 @@ pub fn preferrential_rr(instance: &Instance, pred: &InstancePrediction, robustif
 
         if robustification > 0.0 {
             for (i, job) in jobs.iter_mut().enumerate().skip(rr) {
-                if robustification == 1.0 || (i != pred_order[pspt])  {
+                if robustification == 1.0 || (i != pred_order[pspt]) {
                     job.length -= l * robustification / (pre_n_alive as f64);
                     if job.length <= 0.0 {
                         //println!("rr completed ");
                         if job.completed == false {
-                            job.completed = true;   
+                            job.completed = true;
                             n_alive -= 1;
                             obj += t;
                         }
@@ -86,7 +92,8 @@ pub fn preferrential_rr(instance: &Instance, pred: &InstancePrediction, robustif
             if robustification == 0.0 {
                 jobs[pred_order[pspt]].length -= l;
             } else {
-                jobs[pred_order[pspt]].length -= l * ((1.0 - robustification) + (robustification / (pre_n_alive as f64)));
+                jobs[pred_order[pspt]].length -=
+                    l * ((1.0 - robustification) + (robustification / (pre_n_alive as f64)));
             }
             if jobs[pred_order[pspt]].length <= 0.0 {
                 if jobs[pred_order[pspt]].completed == false {
@@ -115,12 +122,11 @@ pub fn two_stage_schedule(instance: &Instance, pred: &InstancePrediction, lambda
 
     let mut misprediction_detected = false;
 
-    let max_rr = lambda * instance.len() as f64 * opt_y
-        / num_integer::binomial(instance.len(), 2) as f64;
-
+    let max_rr =
+        lambda * instance.len() as f64 * opt_y / num_integer::binomial(instance.len(), 2) as f64;
 
     // RR until time == max_rr
-    while n_alive > 0 && !misprediction_detected && t < max_rr{
+    while n_alive > 0 && !misprediction_detected && t < max_rr {
         assert!(rr < jobs.len());
         if jobs[rr].length <= 0.0 {
             if jobs[rr].completed == false && t > 0.0 {
@@ -135,26 +141,25 @@ pub fn two_stage_schedule(instance: &Instance, pred: &InstancePrediction, lambda
         let pre_n_alive = n_alive;
         for (i, job) in jobs.iter_mut().enumerate().skip(rr) {
             job.length -= l / (pre_n_alive as f64);
-            if job.length <= 0.0 {                
+            if job.length <= 0.0 {
                 if job.completed == false {
-                    job.completed = true;   
+                    job.completed = true;
                     n_alive -= 1;
                     obj += t;
-                    
+
                     if instance[job.id] != pred[job.id] {
                         misprediction_detected = true;
                     }
                 }
                 if i == rr {
                     rr += 1;
-                } 
+                }
             }
         }
-        
     }
 
     assert!(t <= max_rr || !misprediction_detected);
-     
+
     // Schedule remaining jobs in predicted order; break if a misprediction is being detected.
     jobs.sort_by(|j1, j2| j1.pred.partial_cmp(&j2.pred).unwrap());
     let mut idx = 0;
@@ -190,15 +195,15 @@ pub fn two_stage_schedule(instance: &Instance, pred: &InstancePrediction, lambda
         let pre_n_alive = n_alive;
         for (i, job) in jobs.iter_mut().enumerate().skip(rr) {
             job.length -= l / (pre_n_alive as f64);
-            if job.length <= 0.0 {                
+            if job.length <= 0.0 {
                 if job.completed == false {
-                    job.completed = true;   
+                    job.completed = true;
                     n_alive -= 1;
                     obj += t;
                 }
                 if i == rr {
-                     rr += 1;
-                } 
+                    rr += 1;
+                }
             }
         }
     }
@@ -206,22 +211,28 @@ pub fn two_stage_schedule(instance: &Instance, pred: &InstancePrediction, lambda
     obj
 }
 
-
-
-pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, robust: f64, expectation: bool) -> f64 {
+pub fn phase_algorithm(
+    instance: &Instance,
+    pred: &InstancePrediction,
+    robust: f64,
+    expectation: bool,
+) -> f64 {
     let jobs = create_jobs(&instance, &pred);
 
     let mut env = Environment::new(jobs);
     let delta = 1.0 / 50.0;
 
+    // line 2
     while env.nk() as f64 >= (env.n as f64).log2() / (robust * robust * robust) {
-        //println!("Estimating the median...");
-        let m = median_est(&mut env, delta, expectation);
-       //println!("Estimated median: {}", m);
-        //println!("Estimating the error...");
-        let error = error_est(&mut env, robust, m, expectation);
-        if error >= (robust * (delta * delta) * m * env.nk() as f64 * env.nk() as f64) / 16.0 {
-            //println!("RR round");
+        // line 3:
+        let mk = median_est(&mut env, delta, expectation);
+
+        // line 4:
+        let error = error_est(&mut env, robust, mk, expectation);
+
+        // line 5:
+        if error >= (robust * (delta * delta) * mk * env.nk() as f64 * env.nk() as f64) / 16.0 {
+            //line 6:
             env.jobs
                 .sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
             let mut rr_per_job = 0.0;
@@ -230,7 +241,7 @@ pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, robust: f
                 if env.process(j, rr_per_job) {
                     finished += 1;
                 } else {
-                    let amount = env.jobs[j].length.min(2.0 * m - rr_per_job);
+                    let amount = env.jobs[j].length.min(2.0 * mk - rr_per_job);
                     let l = amount * (env.nk() - finished) as f64;
                     env.run_for(l);
                     if env.process(j, amount) {
@@ -241,14 +252,12 @@ pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, robust: f
             }
             env.clear_completed();
         } else {
-            //println!("FtP round");
+            //line 8:
             env.jobs
                 .sort_by(|j1, j2| j1.pred.partial_cmp(&j2.pred).unwrap());
             for j in 0..env.nk() {
-                if env.jobs[j].pred <= (1.0 + robust) * m {
-                    let l = env.jobs[j]
-                        .length
-                        .min(env.jobs[j].pred + 3.0 * robust * m);
+                if env.jobs[j].pred <= (1.0 + robust) * mk {
+                    let l = env.jobs[j].length.min(env.jobs[j].pred + 3.0 * robust * mk);
                     env.run_for(l);
                     env.process(j, l);
                 }
@@ -257,10 +266,9 @@ pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, robust: f
         }
     }
 
-    
     if expectation {
         env.jobs
-        .sort_by(|j1, j2| j1.pred.partial_cmp(&j2.pred).unwrap());
+            .sort_by(|j1, j2| j1.pred.partial_cmp(&j2.pred).unwrap());
 
         for j in 0..env.nk() {
             let l = env.jobs[j].length;
@@ -269,8 +277,9 @@ pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, robust: f
         }
         env.clear_completed();
     } else {
+        // line 10:
         env.jobs
-        .sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
+            .sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
 
         let mut rr_per_job = 0.0;
         let mut finished = 0;
@@ -286,12 +295,13 @@ pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, robust: f
                 rr_per_job += amount;
             }
         }
-        env.clear_completed();  
+        env.clear_completed();
     }
     return env.obj;
 }
 
 fn median_est(env: &mut Environment, delta: f64, expectation: bool) -> f64 {
+    // line 1:
     let sample_size = if expectation {
         ((2.0 * env.nk() as f64).ln() / (delta * delta)).ceil() as usize
     } else {
@@ -315,8 +325,7 @@ fn median_est(env: &mut Environment, delta: f64, expectation: bool) -> f64 {
     });
     let initial_lengths: Vec<f64> = sample.iter().map(|j| env.jobs[**j].length).collect();
 
-    //println!("sample size {}", sample_size);
-    //assert_eq!(sample.len(), sample_size);
+    // line 2:
     let mut rr_per_job = 0.0;
     let mut equal_counter = 1.0;
 
@@ -333,6 +342,7 @@ fn median_est(env: &mut Environment, delta: f64, expectation: bool) -> f64 {
         env.complete(job_idx);
 
         if 2 * i >= sample_size {
+            // line 3
             env.clear_completed();
             return initial_lengths[i]; //rr_per_job;// * equal_counter;
         }
@@ -343,10 +353,10 @@ fn median_est(env: &mut Environment, delta: f64, expectation: bool) -> f64 {
 }
 
 fn error_est(env: &mut Environment, trustness: f64, est_median: f64, expectation: bool) -> f64 {
+    // line 1:
     let sample_size = if expectation {
         ((env.nk() as f64).ln() / (trustness * trustness)).ceil() as usize
-    }
-    else {
+    } else {
         ((env.n as f64).ln() / (trustness * trustness)).ceil() as usize
     };
     let mut indices = Vec::<(usize, usize)>::new();
@@ -363,6 +373,7 @@ fn error_est(env: &mut Environment, trustness: f64, est_median: f64, expectation
     job_sample.sort();
     job_sample.dedup();
 
+    // line 2:
     let mut d = vec![0.0; env.nk() + 1];
     let max_l = (1.0 + trustness) * est_median;
 
@@ -374,6 +385,7 @@ fn error_est(env: &mut Environment, trustness: f64, est_median: f64, expectation
     }
     env.clear_completed();
 
+    // line 3:
     (indices.len() as f64)
         * sample
             .into_iter()
@@ -384,7 +396,7 @@ fn error_est(env: &mut Environment, trustness: f64, est_median: f64, expectation
 
 fn sample_with_replacement<T>(set: &[T], sample_size: usize) -> Vec<&T> {
     if set.is_empty() {
-        return vec![]
+        return vec![];
     }
     let mut rng = rand::thread_rng();
     let mut index_sample = Vec::<&T>::with_capacity(sample_size);

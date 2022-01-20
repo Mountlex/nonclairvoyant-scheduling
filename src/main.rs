@@ -1,10 +1,10 @@
-use sample::Cli;
 use anyhow::Result;
+use sample::Cli;
 
-mod error;
-mod job;
 mod algorithms;
+mod error;
 mod instance;
+mod job;
 mod prediction;
 mod sample;
 
