@@ -62,7 +62,6 @@ pub fn preferrential_rr(
         }
         t += l;
 
-        //println!("l = {}, rr = {}, pred = {}", l, jobs[rr].length, jobs[pred_order[pspt]].length);
         assert!(l >= 0.0);
 
         let pre_n_alive = n_alive;
@@ -80,9 +79,7 @@ pub fn preferrential_rr(
                         }
                         if i == rr {
                             rr += 1;
-                        } else {
-                            //panic!()
-                        }
+                        } 
                     }
                 }
             }
