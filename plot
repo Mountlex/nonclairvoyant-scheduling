@@ -43,6 +43,8 @@ def plot(filename, save):
     df['param'] = df[['name','param']].apply(lambda x: legend(*x),axis=1)
 
     ax = sns.lineplot(data=df, x=x_name, y="cr", hue='param', style='name',markers=("round" in list(df)), linewidth=1.2)
+    ax.set(xscale='log')
+    
     plt.legend(labels=df['param'].unique(),ncol=2)
     
     if x_name == 'round':
