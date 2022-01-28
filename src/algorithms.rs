@@ -211,7 +211,7 @@ pub fn two_stage_schedule(instance: &Instance, pred: &InstancePrediction, lambda
 pub fn phase_algorithm(
     instance: &Instance,
     pred: &InstancePrediction,
-    robust: f64,
+    epsilon: f64,
     expectation: bool,
 ) -> f64 {
     let jobs = create_jobs(&instance, &pred);
@@ -220,15 +220,15 @@ pub fn phase_algorithm(
     let delta = 1.0 / 50.0;
 
     // line 2
-    while env.nk() as f64 >= (env.n as f64).log2() / (robust * robust * robust) {
+    while env.nk() as f64 >= (env.n as f64).log2() / (epsilon * epsilon * epsilon) {
         // line 3:
         let mk = median_est(&mut env, delta, expectation);
 
         // line 4:
-        let error = error_est(&mut env, robust, mk, expectation);
+        let error = error_est(&mut env, epsilon, mk, expectation);
 
         // line 5:
-        if error >= (robust * (delta * delta) * mk * env.nk() as f64 * env.nk() as f64) / 16.0 {
+        if error >= (epsilon * (delta * delta) * mk * env.nk() as f64 * env.nk() as f64) / 16.0 {
             //line 6:
             env.jobs
                 .sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
@@ -253,8 +253,8 @@ pub fn phase_algorithm(
             env.jobs
                 .sort_by(|j1, j2| j1.pred.partial_cmp(&j2.pred).unwrap());
             for j in 0..env.nk() {
-                if env.jobs[j].pred <= (1.0 + robust) * mk {
-                    let l = env.jobs[j].length.min(env.jobs[j].pred + 3.0 * robust * mk);
+                if env.jobs[j].pred <= (1.0 + epsilon) * mk {
+                    let l = env.jobs[j].length.min(env.jobs[j].pred + 3.0 * epsilon * mk);
                     env.run_for(l);
                     env.process(j, l);
                 }
@@ -349,12 +349,12 @@ fn median_est(env: &mut Environment, delta: f64, expectation: bool) -> f64 {
     0.0
 }
 
-fn error_est(env: &mut Environment, trustness: f64, est_median: f64, expectation: bool) -> f64 {
+fn error_est(env: &mut Environment, epsilon: f64, est_median: f64, expectation: bool) -> f64 {
     // line 1:
     let sample_size = if expectation {
-        ((env.nk() as f64).ln() / (trustness * trustness)).ceil() as usize
+        ((env.nk() as f64).log2() / (epsilon * epsilon)).ceil() as usize
     } else {
-        ((env.n as f64).ln() / (trustness * trustness)).ceil() as usize
+        ((env.n as f64).log2() / (epsilon * epsilon)).ceil() as usize
     };
     let mut indices = Vec::<(usize, usize)>::new();
     for i in 0..env.nk() {
@@ -372,7 +372,7 @@ fn error_est(env: &mut Environment, trustness: f64, est_median: f64, expectation
 
     // line 2:
     let mut d = vec![0.0; env.nk() + 1];
-    let max_l = (1.0 + trustness) * est_median;
+    let max_l = (1.0 + epsilon) * est_median;
 
     for job_idx in job_sample {
         let l = env.jobs[job_idx].length.min(max_l);

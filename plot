@@ -42,22 +42,25 @@ def plot(filename, save):
     df['cr'] = df['alg'] / df['opt']
     df['param'] = df[['name','param']].apply(lambda x: legend(*x),axis=1)
 
-    ax = sns.lineplot(data=df, x=x_name, y="cr", hue='param', style='name',markers=("round" in list(df)), linewidth=1.2)
-    ax.set(xscale='log')
+    ax = sns.lineplot(data=df, x=x_name, y="cr", hue='param', style='param', markers=('round' in list(df)), linewidth=2.5, markersize=8)
     
-    plt.legend(labels=df['param'].unique(),ncol=2)
     
     if x_name == 'round':
+        plt.legend(labels=df['param'].unique(),ncol=2, loc="right", bbox_to_anchor=(1.0,0.63))
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        plt.xlabel("Round")
+    else:
+        plt.legend(labels=df['param'].unique(),ncol=2, loc="upper left")
+        ax.set(xscale='symlog')
+        plt.ylim(top=4.5)
+        plt.xlabel("Noise parameter σ")
 
-
-    plt.xlabel(x_name)
     plt.ylabel('Empirical competitive ratio')
     plt.tight_layout()
 
     fig = plt.gcf()
-    fig.set_dpi(400)
-    fig.set_size_inches(8,5)
+    fig.set_dpi(600)
+    fig.set_size_inches(7,4)
 
     if save:
         f = filename.split(".")[0]

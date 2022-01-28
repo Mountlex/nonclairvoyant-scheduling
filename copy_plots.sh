@@ -1,1 +1,1 @@
-cp *.pdf ~/research/online-scheduling/SPAA/img
+cp *.pdf *.csv ~/research/online-scheduling/SPAA/img

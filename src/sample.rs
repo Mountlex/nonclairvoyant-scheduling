@@ -56,11 +56,14 @@ struct Exp1Parameters {
     #[structopt(short = "p", default_value = "5")]
     num_preds: usize,
 
-    #[structopt(long = "step-sigma", default_value = "50.0")]
-    step_sigma: f64,
+    #[structopt(long = "step-sigma")]
+    step_sigma: Option<f64>,
+
+    #[structopt(long = "base-sigma")]
+    base_sigma: Option<f64>,
 
     #[structopt(long = "num-sigma", default_value = "10")]
-    num_sigmas: usize,
+    num_sigmas: i32,
 
     #[structopt(long)]
     rel_sigma: bool,
@@ -118,7 +121,11 @@ impl Cli {
                         let opt = spt(&instance);
                         (0..params.num_sigmas)
                             .flat_map(|sigma_num| {
-                                let sigma = params.step_sigma * sigma_num as f64;
+                                let sigma = if let Some(step_sigma) = params.step_sigma {
+                                    step_sigma * sigma_num as f64
+                                } else {
+                                    params.base_sigma.unwrap().powi(sigma_num) - 1.0
+                                };
                                 (0..params.num_preds)
                                     .flat_map(|_| {
                                         let pred: Instance = if params.rel_sigma {
@@ -135,7 +142,7 @@ impl Cli {
                                         //let simple_error = SimpleError::compute(&instance, &pred);
                                         //let maxmin_error = MaxMinError::compute(&instance, &pred);
                                         let mut entries = vec![];
-                                        [0.1, 0.5, 0.75].iter().for_each(|lambda| {
+                                        [0.1, 0.66].iter().for_each(|lambda| {
                                             entries.push(Entry {
                                                 name: format!("PRR"),
                                                 param: *lambda,
@@ -145,7 +152,7 @@ impl Cli {
                                             });
                                         });
 
-                                        [0.1, 0.5, 0.75].iter().for_each(|lambda| {
+                                        [0.1, 0.66].iter().for_each(|lambda| {
                                             entries.push(Entry {
                                                 name: format!("TwoStage"),
                                                 param: *lambda,
@@ -155,7 +162,7 @@ impl Cli {
                                             });
                                         });
 
-                                        [0.1, 1.0, 5.0].iter().for_each(|lambda| {
+                                        [0.25, 10.0].iter().for_each(|lambda| {
                                             let pred = pred.clone();
                                             let phase =
                                                 phase_algorithm(&instance, &pred, *lambda, false);
@@ -196,7 +203,7 @@ impl Cli {
                         };
                         let ground_truth: Instance = Instance::generate(&instance_params);
                         let mut instances = vec![];
-                        (0..params.timesteps)
+                        (0..params.timesteps+1)
                             .into_iter()
                             .flat_map(|round| {
                                 let pred = create_mean_instance(
@@ -219,7 +226,7 @@ impl Cli {
                                 let opt = spt(&instance);
                                 let mut entries = vec![];
 
-                                [0.1, 0.5, 0.75].iter().for_each(|lambda| {
+                                [0.1, 0.66].iter().for_each(|lambda| {
                                     entries.push(Exp2Entry {
                                         name: format!("PRR"),
                                         param: *lambda,
@@ -229,7 +236,7 @@ impl Cli {
                                     });
                                 });
 
-                                [0.1, 0.5, 0.75].iter().for_each(|lambda| {
+                                [0.1, 0.66].iter().for_each(|lambda| {
                                     entries.push(Exp2Entry {
                                         name: format!("TwoStage"),
                                         param: *lambda,
@@ -239,7 +246,7 @@ impl Cli {
                                     });
                                 });
 
-                                [0.1, 1.0, 5.0].iter().for_each(|lambda| {
+                                [0.25, 10.0].iter().for_each(|lambda| {
                                     let pred = pred.clone();
                                     let phase = phase_algorithm(&instance, &pred, *lambda, false);
                                     entries.push(Exp2Entry {
