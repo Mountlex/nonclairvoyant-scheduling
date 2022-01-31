@@ -1,7 +1,10 @@
 use rand::prelude::SliceRandom;
 
 use crate::{
-    instance::Instance, job::Environment, prediction::InstancePrediction, sample::create_jobs,
+    instance::Instance,
+    job::{self, Environment},
+    prediction::InstancePrediction,
+    sample::create_jobs,
 };
 
 pub fn spt(instance: &Instance) -> f64 {
@@ -79,7 +82,7 @@ pub fn preferrential_rr(
                         }
                         if i == rr {
                             rr += 1;
-                        } 
+                        }
                     }
                 }
             }
@@ -208,12 +211,7 @@ pub fn two_stage_schedule(instance: &Instance, pred: &InstancePrediction, lambda
     obj
 }
 
-pub fn phase_algorithm(
-    instance: &Instance,
-    pred: &InstancePrediction,
-    epsilon: f64,
-    expectation: bool,
-) -> f64 {
+pub fn phase_algorithm(instance: &Instance, pred: &InstancePrediction, epsilon: f64) -> f64 {
     let jobs = create_jobs(&instance, &pred);
 
     let mut env = Environment::new(jobs);
@@ -222,10 +220,10 @@ pub fn phase_algorithm(
     // line 2
     while env.nk() as f64 >= (env.n as f64).log2() / (epsilon * epsilon * epsilon) {
         // line 3:
-        let mk = median_est(&mut env, delta, expectation);
+        let mk = median_est(&mut env, delta);
 
         // line 4:
-        let error = error_est(&mut env, epsilon, mk, expectation);
+        let error = error_est(&mut env, epsilon, mk);
 
         // line 5:
         if error >= (epsilon * (delta * delta) * mk * env.nk() as f64 * env.nk() as f64) / 16.0 {
@@ -254,7 +252,9 @@ pub fn phase_algorithm(
                 .sort_by(|j1, j2| j1.pred.partial_cmp(&j2.pred).unwrap());
             for j in 0..env.nk() {
                 if env.jobs[j].pred <= (1.0 + epsilon) * mk {
-                    let l = env.jobs[j].length.min(env.jobs[j].pred + 3.0 * epsilon * mk);
+                    let l = env.jobs[j]
+                        .length
+                        .min(env.jobs[j].pred + 3.0 * epsilon * mk);
                     env.run_for(l);
                     env.process(j, l);
                 }
@@ -263,99 +263,85 @@ pub fn phase_algorithm(
         }
     }
 
-    if expectation {
-        env.jobs
-            .sort_by(|j1, j2| j1.pred.partial_cmp(&j2.pred).unwrap());
+    // line 10:
+    env.jobs
+        .sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
 
-        for j in 0..env.nk() {
-            let l = env.jobs[j].length;
+    let mut rr_per_job = 0.0;
+    let mut finished = 0;
+    for j in 0..env.nk() {
+        if env.process(j, rr_per_job) {
+            finished += 1;
+        } else {
+            let amount = env.jobs[j].length;
+            let l = amount * (env.nk() - finished) as f64;
             env.run_for(l);
-            env.process(j, l);
+            env.complete(j);
+            finished += 1;
+            rr_per_job += amount;
         }
-        env.clear_completed();
-    } else {
-        // line 10:
-        env.jobs
-            .sort_by(|j1, j2| j1.length.partial_cmp(&j2.length).unwrap());
-
-        let mut rr_per_job = 0.0;
-        let mut finished = 0;
-        for j in 0..env.nk() {
-            if env.process(j, rr_per_job) {
-                finished += 1;
-            } else {
-                let amount = env.jobs[j].length;
-                let l = amount * (env.nk() - finished) as f64;
-                env.run_for(l);
-                env.complete(j);
-                finished += 1;
-                rr_per_job += amount;
-            }
-        }
-        env.clear_completed();
     }
+    env.clear_completed();
+    assert_eq!(env.nk(), 0);
     return env.obj;
 }
 
-fn median_est(env: &mut Environment, delta: f64, expectation: bool) -> f64 {
+fn median_est(env: &mut Environment, delta: f64) -> f64 {
     // line 1:
-    let sample_size = if expectation {
-        ((2.0 * env.nk() as f64).ln() / (delta * delta)).ceil() as usize
-    } else {
-        ((2.0 * env.n as f64).ln() / (delta * delta)).ceil() as usize
-    };
+    let sample_size = ((2.0 * env.n as f64).ln() / (delta * delta)).ceil() as usize;
     let indices = (0..env.nk()).collect::<Vec<usize>>();
-    //let mut rng = rand::thread_rng();
-    // TODO still a bug when sampling with replacement.
-    //let mut sample: Vec<&usize> = indices.choose_multiple(&mut rng, sample_size).collect(); //
     let mut sample: Vec<&usize> = sample_with_replacement(&indices, sample_size);
-    let max_index = **sample.iter().max().unwrap();
-    let mut occurences = vec![0; max_index + 1];
+    let max_job_index = **sample.iter().max().unwrap();
+
+    // how often does a job occur in sample
+    let mut occurences = vec![0; max_job_index + 1];
     for &&idx in &sample {
         occurences[idx] += 1;
     }
 
+    // sort the jobs in the sample in the order of their completion by RR
     sample.sort_by(|&i, &j| {
         (env.jobs[*i].length / occurences[*i] as f64)
             .partial_cmp(&(env.jobs[*j].length / occurences[*j] as f64))
             .unwrap()
     });
+
+    // remove duplicatd
+    sample.dedup();
+
     let initial_lengths: Vec<f64> = sample.iter().map(|j| env.jobs[**j].length).collect();
 
     // line 2:
     let mut rr_per_job = 0.0;
-    let mut equal_counter = 1.0;
 
-    for (i, &&job_idx) in sample.iter().enumerate() {
-        if i + 1 < sample.len() && *sample[i + 1] == job_idx {
-            equal_counter += 1.0;
-            continue;
+    // count completed job for break condition
+    let mut finished = 0;
+
+    for (i, &job_idx) in sample.into_iter().enumerate() {
+        if env.process(job_idx, rr_per_job * occurences[job_idx] as f64) {
+            finished += occurences[job_idx];
+        } else {
+            let amount = env.jobs[job_idx].length;
+            let l = amount * (sample_size - finished) as f64 / occurences[job_idx] as f64;
+            env.run_for(l);
+            env.complete(job_idx);
+            finished += occurences[job_idx];
+            rr_per_job += amount / occurences[job_idx] as f64;
         }
-        env.process(job_idx, rr_per_job * equal_counter);
-        let l = env.jobs[job_idx].length * ((sample_size - i) as f64 + equal_counter - 1.0)
-            / equal_counter;
-        rr_per_job += env.jobs[job_idx].length / equal_counter;
-        env.run_for(l);
-        env.complete(job_idx);
 
-        if 2 * i >= sample_size {
+        if 2 * finished >= sample_size {
             // line 3
             env.clear_completed();
-            return initial_lengths[i]; //rr_per_job;// * equal_counter;
+            return initial_lengths[i];
         }
-        equal_counter = 1.0;
     }
 
-    0.0
+    panic!("Median estimation did not work properly!");
 }
 
-fn error_est(env: &mut Environment, epsilon: f64, est_median: f64, expectation: bool) -> f64 {
+fn error_est(env: &mut Environment, epsilon: f64, est_median: f64) -> f64 {
     // line 1:
-    let sample_size = if expectation {
-        ((env.nk() as f64).log2() / (epsilon * epsilon)).ceil() as usize
-    } else {
-        ((env.n as f64).log2() / (epsilon * epsilon)).ceil() as usize
-    };
+    let sample_size = ((env.n as f64).log2() / (epsilon * epsilon)).ceil() as usize;
     let mut indices = Vec::<(usize, usize)>::new();
     for i in 0..env.nk() {
         for j in i..env.nk() {
@@ -373,7 +359,6 @@ fn error_est(env: &mut Environment, epsilon: f64, est_median: f64, expectation: 
     // line 2:
     let mut d = vec![0.0; env.nk() + 1];
     let max_l = (1.0 + epsilon) * est_median;
-
     for job_idx in job_sample {
         let l = env.jobs[job_idx].length.min(max_l);
         d[job_idx] = (l - env.jobs[job_idx].pred.min(max_l)).abs();

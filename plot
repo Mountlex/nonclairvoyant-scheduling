@@ -46,8 +46,8 @@ def plot(filename, save):
     
     
     if x_name == 'round':
-        plt.legend(labels=df['param'].unique(),ncol=2, loc="right", bbox_to_anchor=(1.0,0.63))
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        plt.legend(labels=df['param'].unique(),ncol=2, loc="right", bbox_to_anchor=(1.0,0.63))
         plt.xlabel("Round")
     else:
         plt.legend(labels=df['param'].unique(),ncol=2, loc="upper left")

@@ -165,7 +165,7 @@ impl Cli {
                                         [0.25, 10.0].iter().for_each(|lambda| {
                                             let pred = pred.clone();
                                             let phase =
-                                                phase_algorithm(&instance, &pred, *lambda, false);
+                                                phase_algorithm(&instance, &pred, *lambda);
                                             entries.push(Entry {
                                                 name: format!("Im et al."),
                                                 param: *lambda,
@@ -203,7 +203,7 @@ impl Cli {
                         };
                         let ground_truth: Instance = Instance::generate(&instance_params);
                         let mut instances = vec![];
-                        (0..params.timesteps+1)
+                        (0..params.timesteps + 1)
                             .into_iter()
                             .flat_map(|round| {
                                 let pred = create_mean_instance(
@@ -248,7 +248,7 @@ impl Cli {
 
                                 [0.25, 10.0].iter().for_each(|lambda| {
                                     let pred = pred.clone();
-                                    let phase = phase_algorithm(&instance, &pred, *lambda, false);
+                                    let phase = phase_algorithm(&instance, &pred, *lambda);
                                     entries.push(Exp2Entry {
                                         name: format!("Im et al."),
                                         param: *lambda,
