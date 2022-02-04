@@ -44,7 +44,6 @@ def plot(filename, save):
 
     ax = sns.lineplot(data=df, x=x_name, y="cr", hue='param', style='param', markers=('round' in list(df)), linewidth=2.5, markersize=8)
     
-    
     if x_name == 'round':
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         plt.legend(labels=df['param'].unique(),ncol=2, loc="right", bbox_to_anchor=(1.0,0.63))
