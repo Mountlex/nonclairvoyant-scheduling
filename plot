@@ -23,7 +23,7 @@ def legend(name, param):
     if "Im" in name:
         return f"Im et al. (ε = {param})"
     elif "PRR" in name:
-        return f"PRR (λ = {param})"
+        return f"PTS (λ = {param})"
     elif "Two" in name:
         return f"Two-Stage (λ = {param})"
     else:
@@ -53,7 +53,7 @@ def plot(filename, save):
         plt.legend(labels=df['param'].unique(),ncol=2, loc="upper left")
         ax.set(xscale='symlog')
         plt.ylim(top=4.5)
-        plt.xlabel("Noise parameter σ")
+        plt.xlabel("Noise parameter ω")
 
     plt.ylabel('Empirical competitive ratio')
     plt.tight_layout()
