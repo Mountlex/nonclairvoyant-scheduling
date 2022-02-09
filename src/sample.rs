@@ -164,8 +164,7 @@ impl Cli {
 
                                         [0.25, 10.0].iter().for_each(|lambda| {
                                             let pred = pred.clone();
-                                            let phase =
-                                                phase_algorithm(&instance, &pred, *lambda);
+                                            let phase = phase_algorithm(&instance, &pred, *lambda);
                                             entries.push(Entry {
                                                 name: format!("Im et al."),
                                                 param: *lambda,

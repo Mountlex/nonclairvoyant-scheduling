@@ -1,10 +1,7 @@
 use rand::prelude::SliceRandom;
 
 use crate::{
-    instance::Instance,
-    job::{self, Environment},
-    prediction::InstancePrediction,
-    sample::create_jobs,
+    instance::Instance, job::Environment, prediction::InstancePrediction, sample::create_jobs,
 };
 
 pub fn spt(instance: &Instance) -> f64 {

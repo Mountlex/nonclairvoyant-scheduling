@@ -19,5 +19,3 @@ anyhow = "1.0.37"
 num-integer = "0.1.44"
 
 
-[profile.release]
-debug = true
