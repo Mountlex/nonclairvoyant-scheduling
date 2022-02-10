@@ -21,11 +21,11 @@ def create_arg_parser():
 
 def legend(name, param):
     if "Im" in name:
-        return f"Multi-Stage (ε = {param})"
+        return f"MultiStage (ε = {param})"
     elif "PRR" in name:
         return f"PTS (λ = {param})"
     elif "Two" in name:
-        return f"Two-Stage (λ = {param})"
+        return f"TwoStage (λ = {param})"
     else:
         return "Round-Robin"
 
