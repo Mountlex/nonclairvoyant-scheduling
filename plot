@@ -61,9 +61,9 @@ def plot(filename, save):
         if "exp3" in filename:
             ax.legend(handlers, df['param'].unique(),ncol=2, loc="upper left")
             ax.set(xscale='symlog')
-            plt.ylim(top=5)
+            plt.ylim(top=3)
             plt.xlabel("Noise parameter ω")
-            plt.ylabel('Empirical competitive ratio against P-WSPT')
+            plt.ylabel('Empirical comp. ratio w.r.t. P-WSPT')
 
     plt.tight_layout()
 

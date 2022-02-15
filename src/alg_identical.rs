@@ -75,6 +75,9 @@ pub fn wdeq(
     let mut n = releases.len();
     let mut jobs: Vec<Job> = vec![];
 
+    let mut wdeq_rates: Vec<f64> = vec![];
+    let mut recompute_rates = true;
+
     loop {
         // interval [t,t+1]
         let released_jobs: Vec<ID> = releases.iter().enumerate().filter(|(_, &r)| r * scale == t).map(|(id, _)| id).collect();
@@ -82,38 +85,24 @@ pub fn wdeq(
             for j in released_jobs {
                 jobs.push(Job { id: j, weight: weights[j], pred: instance[j] * scale as f64, length: instance[j] * scale as f64});
             }
+            recompute_rates = true;
         }
 
-        // WDEQ
-        let mut rm = m;
-        let mut K: Vec<usize> = (0..jobs.len()).collect();
-        'find: loop {
-            let wk = total_weight(&jobs, &K);
-            let mut job: Option<usize> = None;
-            for &j in &K {
-                if jobs[j].weight * rm as f64 / wk >= 1.0 {
-                    jobs[j].length -= 1.0;
-                    rm -= 1;
-                    job = Some(j.clone());
-                    break
-                }
-            }
-            if let Some(job) = job {
-                K.retain(|&j| j != job);
-            } else {
-                break 'find;
-            }
+        if recompute_rates {
+            wdeq_rates = compute_wdeq_rates(&jobs, m);
+            recompute_rates = false;
         }
-        let wk = total_weight(&jobs, &K);
-        for j in K {
-            let rate = jobs[j].weight * rm as f64 / wk;
-            jobs[j].length -= rate;
+        for (idx, j) in jobs.iter_mut().enumerate() {
+            j.length -= wdeq_rates[idx];
         }
 
         t += 1;
         
         // clear finished jobs
         let n_finished = jobs.iter().filter(|j| j.length <= 0.0).count();
+        if n_finished > 0 {
+            recompute_rates = true;
+        }
         n -= n_finished;
         obj += t * n_finished;
         jobs.retain(|j| j.length > 0.0);
@@ -124,6 +113,34 @@ pub fn wdeq(
     }
 }
 
+fn compute_wdeq_rates(jobs: &[Job], m: usize) -> Vec<f64> {
+    let mut rm = m;
+    let mut rem_jobs: Vec<usize> = (0..jobs.len()).collect();
+    let n = jobs.len();
+    let mut rates: Vec<f64> = vec![0.0;n];
+    'find: loop {
+        let wk = total_weight(&jobs, &rem_jobs);
+        let mut job: Option<usize> = None;
+        for &j in &rem_jobs {
+            if jobs[j].weight * rm as f64 / wk >= 1.0 {
+                rates[j] = 1.0;
+                rm -= 1;
+                job = Some(j.clone());
+                break
+            }
+        }
+        if let Some(job) = job {
+            rem_jobs.retain(|&j| j != job);
+        } else {
+            break 'find;
+        }
+    }
+    let wk = total_weight(&jobs, &rem_jobs);
+    for j in rem_jobs {
+        rates[j] = jobs[j].weight * rm as f64 / wk;
+    }
+    rates
+}
 
 pub fn pts(
     instance: &Instance,
@@ -140,6 +157,9 @@ pub fn pts(
     let mut n = releases.len();
     let mut jobs: Vec<Job> = vec![];
 
+    let mut wdeq_rates: Vec<f64> = vec![];
+    let mut recompute_rates = true;
+
     loop {
         // interval [t,t+1]
         let released_jobs: Vec<ID> = releases.iter().enumerate().filter(|(_, &r)| r * scale == t).map(|(id, _)| id).collect();
@@ -148,6 +168,7 @@ pub fn pts(
                 jobs.push(Job { id: j, weight: weights[j], pred: pred[j] * scale as f64, length: instance[j] * scale as f64});
             }
             jobs.sort_by(|j1,j2| (j2.weight / j2.pred).partial_cmp(&(j1.weight / j1.pred)).unwrap());
+            recompute_rates = true;
         }
 
         // P-WSPT
@@ -157,35 +178,21 @@ pub fn pts(
         }
 
         // WDEQ
-        let mut rm = m;
-        let mut K: Vec<usize> = (0..jobs.len()).collect();
-        'find: loop {
-            let wk = total_weight(&jobs, &K);
-            let mut job: Option<usize> = None;
-            for &j in &K {
-                if jobs[j].weight * rm as f64 / wk >= 1.0 {
-                    jobs[j].length -= robustification;
-                    rm -= 1;
-                    job = Some(j.clone());
-                    break
-                }
-            }
-            if let Some(job) = job {
-                K.retain(|&j| j != job);
-            } else {
-                break 'find;
-            }
+        if recompute_rates {
+            wdeq_rates = compute_wdeq_rates(&jobs, m);
+            recompute_rates = false;
         }
-        let wk = total_weight(&jobs, &K);
-        for j in K {
-            let rate = jobs[j].weight * rm as f64 / wk;
-            jobs[j].length -= rate * robustification;
+        for (idx, j) in jobs.iter_mut().enumerate() {
+            j.length -= robustification * wdeq_rates[idx];
         }
 
         t += 1;
         
         // clear finished jobs
         let n_finished = jobs.iter().filter(|j| j.length <= 0.0).count();
+        if n_finished > 0 {
+            recompute_rates = true;
+        }
         n -= n_finished;
         obj += t * n_finished;
         jobs.retain(|j| j.length > 0.0);
