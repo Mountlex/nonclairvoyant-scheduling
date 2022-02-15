@@ -7,6 +7,7 @@ mod instance;
 mod job;
 mod prediction;
 mod sample;
+mod alg_identical;
 
 pub trait Gen<P> {
     fn generate(params: &P) -> Self;

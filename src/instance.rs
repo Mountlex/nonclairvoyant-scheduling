@@ -1,7 +1,7 @@
 use std::{iter::FromIterator, ops::Index};
 
 use rand::{distributions::Distribution, prelude::SliceRandom};
-use rand_distr::Pareto;
+use rand_distr::{Pareto,Exp1,Weibull,Zipf};
 
 use crate::Gen;
 
@@ -9,6 +9,8 @@ use crate::Gen;
 pub struct Instance {
     pub jobs: Vec<f64>,
 }
+
+
 
 impl Instance {
     pub fn len(&self) -> usize {
@@ -56,11 +58,13 @@ impl Gen<InstanceGenParams> for Instance {
     fn generate(params: &InstanceGenParams) -> Instance {
         let mut rng = rand::thread_rng();
         let dist = Pareto::new(1.0, params.alpha).unwrap();
+        //let dist = Weibull::new(2.0, 0.5).unwrap();
+        //let dist = Zipf::new(20000, 1.1).unwrap();
 
         let mut jobs: Vec<f64> = dist
             .sample_iter(&mut rng)
             .take(params.length)
-            .map(|j| j as f64)
+            .map(|j: f64| j)
             .collect();
 
         jobs.shuffle(&mut rng);
@@ -68,6 +72,28 @@ impl Gen<InstanceGenParams> for Instance {
         jobs.into()
     }
 }
+
+pub fn sample_floats(alpha: f64, num: usize) -> Vec<f64> {
+    let mut rng = rand::thread_rng();
+        let dist = Pareto::new(1.0, alpha).unwrap();
+        //let dist = Weibull::new(2.0, 0.5).unwrap();
+        //let dist = Zipf::new(20000, 1.1).unwrap();
+
+        let mut jobs: Vec<f64> = dist
+            .sample_iter(&mut rng)
+            .take(num)
+            .map(|j: f64| j)
+            .collect();
+
+        jobs.shuffle(&mut rng);
+
+        jobs
+}
+
+pub fn sample_integers(alpha: f64, num: usize) -> Vec<usize> {
+    sample_floats(alpha, num).into_iter().map(|f| f.round() as usize).collect()
+}
+
 
 pub fn analyse_instances(instances: &Vec<Instance>) {
     let flat: Vec<f64> = instances

@@ -22,15 +22,17 @@ def create_arg_parser():
 def legend(name, param):
     if "Im" in name:
         return f"MultiStage (ε = {param})"
-    elif "PRR" in name:
+    elif "PTS" in name or "PRR" in name:
         return f"PTS (λ = {param})"
     elif "Two" in name:
         return f"TwoStage (λ = {param})"
+    elif "WDEQ" in name:
+        return f"WDEQ"
     else:
         return "Round-Robin"
 
 def plot(filename, save):
-    if "exp1" in filename:
+    if "exp1" in filename or "exp3" in filename:
         x_name = "sigma"
     else:
         x_name = "round"
@@ -43,18 +45,26 @@ def plot(filename, save):
     df['param'] = df[['name','param']].apply(lambda x: legend(*x),axis=1)
 
     ax = sns.lineplot(data=df, x=x_name, y="cr", hue='param', style='param', markers=('round' in list(df)), linewidth=2.5, markersize=8)
-    
+    handlers, _ = ax.get_legend_handles_labels()
+
     if x_name == 'round':
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-        plt.legend(labels=df['param'].unique(),ncol=2, loc="right", bbox_to_anchor=(1.0,0.63))
+        ax.legend(handlers,df['param'].unique(),ncol=2, loc="right", bbox_to_anchor=(1.0,0.63))
         plt.xlabel("Round")
     else:
-        plt.legend(labels=df['param'].unique(),ncol=2, loc="upper left")
-        ax.set(xscale='symlog')
-        plt.ylim(top=4.5)
-        plt.xlabel("Noise parameter ω")
+        if "exp1" in filename:
+            ax.legend(handlers, df['param'].unique(),ncol=2, loc="upper left")
+            ax.set(xscale='symlog')
+            plt.ylim(top=4.5)
+            plt.xlabel("Noise parameter ω")
+            plt.ylabel('Empirical competitive ratio')
+        if "exp3" in filename:
+            ax.legend(handlers, df['param'].unique(),ncol=2, loc="upper left")
+            ax.set(xscale='symlog')
+            plt.ylim(top=5)
+            plt.xlabel("Noise parameter ω")
+            plt.ylabel('Empirical competitive ratio against P-WSPT')
 
-    plt.ylabel('Empirical competitive ratio')
     plt.tight_layout()
 
     fig = plt.gcf()

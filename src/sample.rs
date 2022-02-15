@@ -10,10 +10,10 @@ use structopt::StructOpt;
 
 use crate::{
     algorithms::{phase_algorithm, preferrential_rr, spt, two_stage_schedule},
-    instance::{analyse_instances, Instance, InstanceGenParams},
+    instance::{analyse_instances, Instance, InstanceGenParams, sample_floats, sample_integers},
     job::Job,
     prediction::{InstancePrediction, PredGenParams, ScaledPredGenParams},
-    Gen,
+    Gen, alg_identical::{pwspt, pts, wdeq},
 };
 
 #[derive(Debug, StructOpt)]
@@ -35,6 +35,7 @@ pub struct Cli {
 enum Experiments {
     Exp1(Exp1Parameters),
     Exp2(Exp2Parameters),
+    Exp3(Exp3Parameters),
 }
 #[derive(Debug, Serialize)]
 struct Entry {
@@ -93,6 +94,39 @@ struct Exp2Parameters {
     instance_length: usize,
 }
 
+#[derive(StructOpt, Debug)]
+struct Exp3Parameters {
+    #[structopt(short = "l", long, default_value = "1000")]
+    instance_length: usize,
+
+    #[structopt(short = "n")]
+    num_instances: usize,
+
+    #[structopt(short)]
+    m: usize,
+
+    #[structopt(short, default_value = "1")]
+    scale: usize,
+
+    #[structopt(short = "p", default_value = "5")]
+    num_preds: usize,
+
+    #[structopt(long = "base-sigma")]
+    base_sigma: Option<f64>,
+
+    #[structopt(long = "num-sigma", default_value = "10")]
+    num_sigmas: i32,
+
+    #[structopt(short, long = "l-alpha", default_value = "1.1")]
+    length_alpha: f64,
+
+    #[structopt(short, long = "w-alpha", default_value = "2.0")]
+    weight_alpha: f64,
+
+    #[structopt(short, long = "r-alpha", default_value = "2.0")]
+    release_alpha: f64,
+}
+
 #[derive(Debug, Serialize)]
 struct Exp2Entry {
     name: String,
@@ -101,6 +135,11 @@ struct Exp2Entry {
     alg: f64,
     round: usize,
 }
+
+
+
+
+
 
 impl Cli {
     pub fn sample(&self) -> Result<()> {
@@ -271,6 +310,58 @@ impl Cli {
                             .collect::<Vec<Exp2Entry>>()
                     })
                     .collect::<Vec<Exp2Entry>>();
+                export(&self.output, results)
+            },
+            Experiments::Exp3(params) => {
+                let instance_params = InstanceGenParams {
+                    length: params.instance_length,
+                    alpha: params.length_alpha,
+                };
+                let instances: Vec<(Instance, Vec<f64>, Vec<usize>)> = (0..params.num_instances)
+                    .map(|_| (Instance::generate(&instance_params), sample_floats(params.weight_alpha, params.instance_length), sample_integers(params.release_alpha, params.instance_length))
+                )
+                    .collect();
+                let results: Vec<Entry> = instances
+                    .into_par_iter()
+                    .flat_map(|(instance, weights, releases)| {
+                        let opt = pwspt(&instance, &weights, &releases, params.m, params.scale);
+                        let wdeq = wdeq(&instance, &weights, &releases, params.m, params.scale);
+                        (0..params.num_sigmas)
+                            .flat_map(|sigma_num| {
+                                let sigma = params.base_sigma.unwrap().powi(sigma_num) - 1.0;
+                                (0..params.num_preds)
+                                    .flat_map(|_| {
+                                        let pred: Instance = InstancePrediction::generate(&PredGenParams {
+                                                sigma,
+                                                instance: &instance,
+                                            });
+                                        
+                                        let mut entries = vec![];
+                                        [0.1, 0.5, 0.8].iter().for_each(|lambda| {
+                                            entries.push(Entry {
+                                                name: format!("PTS"),
+                                                param: *lambda,
+                                                sigma,
+                                                opt,
+                                                alg: pts(&instance, &pred, &weights, &releases, *lambda, params.m, params.scale),
+                                            });
+                                        });
+
+                                        entries.push(Entry {
+                                            name: format!("WDEQ"),
+                                            param: 0.0,
+                                            sigma,
+                                            opt,
+                                            alg: wdeq,
+                                        });
+                                        entries
+                                    })
+                                    .collect::<Vec<Entry>>()
+                            })
+                            .collect::<Vec<Entry>>()
+                    })
+                    .collect();
+
                 export(&self.output, results)
             }
         }
