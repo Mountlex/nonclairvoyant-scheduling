@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 
 from cycler import cycler
 import argparse
@@ -61,7 +60,7 @@ def plot(filename, save):
         if "exp3" in filename:
             ax.legend(handlers, df['param'].unique(),ncol=2, loc="upper left")
             ax.set(xscale='symlog')
-            plt.ylim(top=2.7)
+            plt.ylim(top=2.8)
             plt.xlabel("Noise parameter ω")
             plt.ylabel('Empirical comp. ratio w.r.t. P-WSPT')
 

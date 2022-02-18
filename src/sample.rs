@@ -324,7 +324,10 @@ impl Cli {
                 let results: Vec<Entry> = instances
                     .into_par_iter()
                     .flat_map(|(instance, weights, releases)| {
+                        println!("pwspt");
                         let opt = pwspt(&instance, &weights, &releases, params.m, params.scale);
+                        println!("wdeq");
+
                         let wdeq = wdeq(&instance, &weights, &releases, params.m, params.scale);
                         (0..params.num_sigmas)
                             .flat_map(|sigma_num| {
@@ -338,6 +341,8 @@ impl Cli {
                                         
                                         let mut entries = vec![];
                                         [0.1, 0.5, 0.8].iter().for_each(|lambda| {
+                                        println!("pts");
+
                                             entries.push(Entry {
                                                 name: format!("PTS"),
                                                 param: *lambda,
