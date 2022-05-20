@@ -1,13 +1,15 @@
 
-from cycler import cycler
 import argparse
 import sys
 import os
 import seaborn as sns
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
+
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
 
 def create_arg_parser():
     parser = argparse.ArgumentParser()
